@@ -5,6 +5,7 @@ import { createTerrainProvider, sampleHeight } from './terrain.js';
 import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
 import { findFlight, knownRoute, placeName } from './flights.js';
 import { visiblePasses, downloadPassIcs } from './sky.js';
+import { splitDestination, knownPort, portLabel } from './ports.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
 import { fetchWeather, describeWeather, searchPlaces } from './weather.js';
 import { bearing, destination, distanceM, clamp, fmt0, fmt1, compass } from './geo.js';
@@ -513,8 +514,46 @@ function restoreShips() {
   } catch { /* dati non validi */ }
 }
 
+// Nome, tipo, destinazione e arrivo arrivano solo ogni 6 minuti: li ricordiamo per 3 giorni
+const SHIPINFO_KEY = 'finestrino.shipinfo.v1';
+const INFO_FIELDS = ['name', 'type', 'destination', 'eta', 'length'];
+const shipInfo = (() => {
+  try {
+    const all = JSON.parse(localStorage.getItem(SHIPINFO_KEY) || '{}');
+    const limit = Date.now() - 3 * 86400000;
+    for (const k of Object.keys(all)) if (!all[k].t || all[k].t < limit) delete all[k];
+    return all;
+  } catch { return {}; }
+})();
+let shipInfoDirty = false;
+
+function rememberShipInfo(d) {
+  const info = shipInfo[d.mmsi] || {};
+  let changed = false;
+  for (const f of INFO_FIELDS) {
+    if (d[f] != null && d[f] !== '' && info[f] !== d[f]) { info[f] = d[f]; changed = true; }
+  }
+  if (changed) { info.t = Date.now(); shipInfo[d.mmsi] = info; shipInfoDirty = true; }
+}
+
+function withShipInfo(d) {
+  const info = shipInfo[d.mmsi];
+  if (!info) return d;
+  const out = { ...d };
+  for (const f of INFO_FIELDS) if ((out[f] == null || out[f] === '') && info[f] != null) out[f] = info[f];
+  return out;
+}
+
+setInterval(() => {
+  if (!shipInfoDirty) return;
+  shipInfoDirty = false;
+  try { localStorage.setItem(SHIPINFO_KEY, JSON.stringify(shipInfo)); } catch { /* spazio pieno */ }
+}, 10000);
+
 function mergeShips(list, save = true) {
-  for (const d of list) {
+  for (const raw of list) {
+    rememberShipInfo(raw);
+    const d = withShipInfo(raw);
     const h = state.ships.get(d.mmsi);
     if (h) {
       h.data = { ...h.data, ...d };
@@ -623,9 +662,54 @@ function entityAt(win) {
 viewer.screenSpaceEventHandler.setInputAction((click) => {
   if (state.mode === 'intro' || state.mode === 'arriving') return;
   const e = entityAt(click.position);
-  if (e) openCard(e.id);
+  if (e && e.id !== 'route-line') openCard(e.id);
   else if (state.selected) closeCard();
 }, C.ScreenSpaceEventType.LEFT_CLICK);
+
+// Linea tratteggiata dal mezzo selezionato alla sua destinazione
+const routeLine = viewer.entities.add({
+  id: 'route-line',
+  show: false,
+  polyline: {
+    positions: [],
+    width: 2,
+    arcType: C.ArcType.GEODESIC,
+    material: new C.PolylineDashMaterialProperty({ color: C.Color.WHITE.withAlpha(0.75), dashLength: 18 }),
+  },
+});
+
+function updateRouteLine() {
+  const id = state.selected || (state.mode === 'ride' && state.ride ? `${state.ride.kind}:${state.ride.id}` : null);
+  let from = null;
+  let to = null;
+  let color = PLANE;
+  if (id) {
+    const [kind, key] = id.split(':');
+    if (kind === 'plane') {
+      const p = state.planes.get(key);
+      const rt = p && p.data.callsign ? knownRoute(p.data.callsign) : null;
+      if (p && rt && rt.destination && rt.destination.lat != null) {
+        const pos = aircraftPosition(p.data, Date.now());
+        from = [pos.lon, pos.lat, pos.alt];
+        to = [rt.destination.lon, rt.destination.lat, 0];
+      }
+    } else if (kind === 'ship') {
+      const sh = state.ships.get(Number(key));
+      const dest = sh && sh.data.destination ? splitDestination(sh.data.destination) : null;
+      const port = dest && dest.to ? knownPort(dest.to) : null;
+      if (port) {
+        const pos = shipPosition(sh.data, Date.now());
+        from = [pos.lon, pos.lat, 30];
+        to = [port.lon, port.lat, 30];
+        color = SHIP;
+      }
+    }
+  }
+  if (!from) { routeLine.show = false; return; }
+  routeLine.polyline.positions = C.Cartesian3.fromDegreesArrayHeights([...from, ...to]);
+  routeLine.polyline.material = new C.PolylineDashMaterialProperty({ color: color.withAlpha(0.8), dashLength: 18 });
+  routeLine.show = true;
+}
 
 function openCard(id) {
   state.selected = id;
@@ -636,6 +720,7 @@ function openCard(id) {
 function closeCard() {
   state.selected = null;
   $('card').hidden = true;
+  updateRouteLine();
 }
 
 function row(dt, dd) {
@@ -687,10 +772,32 @@ function renderCard() {
       ? row('Velocità', `${fmt1(d.sog)} nodi (${fmt0(d.sog * 1.852)} km/h)`)
       : row('Velocità', 'ferma');
     if (d.sog > 0.3 && d.cog != null) rows += row('Direzione', `verso ${compass(d.cog)}`);
-    if (d.destination) rows += row('Destinazione', escapeHtml(d.destination));
+
+    // Rotta: partenza (se l'equipaggio la scrive) e destinazione
+    const dest = d.destination ? splitDestination(d.destination) : null;
+    const toPort = dest && dest.to ? knownPort(dest.to) : null;
+    const fromPort = dest && dest.from ? knownPort(dest.from) : null;
+    const dateFmt = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
+    if (dest && dest.to) {
+      const toName = toPort ? portLabel(toPort) : dest.to;
+      const fromName = dest.from ? (fromPort ? portLabel(fromPort) : dest.from) : null;
+      route = fromName ? `${fromName} → ${toName}` : toPort ? `Verso ${toName}` : `Destinazione: ${toName}`;
+      if (toPort) {
+        const left = distanceM(pos.lat, pos.lon, toPort.lat, toPort.lon) / 1000;
+        rows += row('Mancano', `${fmt0(left / 1.852)} miglia (${fmt0(left)} km in linea d'aria)`);
+        if (d.sog > 1) {
+          const est = new Date(Date.now() + (left / (d.sog * 1.852)) * 3600000 * 1.1);
+          rows += row('Arrivo (stima)', escapeHtml(est.toLocaleString('it-IT', dateFmt)));
+        }
+      }
+      if (toPort) rows += row('Destinazione scritta', escapeHtml(d.destination));
+    } else {
+      route = 'Destinazione non ancora ricevuta: le navi la trasmettono ogni 6 minuti';
+      routeMuted = true;
+    }
     if (d.eta) {
       const eta = new Date(d.eta);
-      rows += row('Arrivo previsto', escapeHtml(eta.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })));
+      rows += row('Arrivo dichiarato', escapeHtml(eta.toLocaleString('it-IT', dateFmt)));
     }
     if (d.length) rows += row('Lunghezza', `${fmt0(d.length)} m`);
     rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
@@ -876,6 +983,7 @@ function toast(message) {
 setInterval(() => {
   updateStatus();
   if (state.selected) renderCard();
+  updateRouteLine();
 }, 1000);
 
 // ---------------------------------------------------------------- luogo
