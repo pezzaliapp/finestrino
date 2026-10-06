@@ -42,20 +42,12 @@ a { color: var(--sign); }
 #globe { position: fixed; inset: 0; touch-action: none; }
 .cesium-widget canvas { touch-action: none; }
 
-/* Crediti di Cesium: piccoli, in alto a destra, sempre visibili */
-.cesium-viewer-bottom {
-  left: auto !important;
-  right: calc(8px + var(--safe-r));
-  bottom: auto !important;
-  top: calc(60px + var(--safe-t));
-  padding: 0 !important;
-  opacity: 0.75;
-  max-width: 60vw;
-}
-.cesium-credit-textContainer, .cesium-credit-expand-link { font-size: 10px; }
+/* I crediti di Cesium vivono nella finestra "Fonti dei dati" */
+.cesium-viewer-bottom { display: none !important; }
 
 /* ---------- Bottoni ---------- */
 .primary, .ghost, .seg {
+  white-space: nowrap;
   border: 0;
   cursor: pointer;
   border-radius: 999px;
@@ -115,6 +107,14 @@ a { color: var(--sign); }
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .weather:empty { display: none; }
+.info {
+  flex: none; width: 38px; height: 38px; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--night-a); color: var(--ink); font-weight: 700; font-size: 1rem;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.info:hover { box-shadow: inset 0 0 0 1px var(--ink-2); }
+.weather + .info { margin-left: 0; }
+.weather:empty + .info { margin-left: auto; }
 
 /* ---------- Stato e avvisi ---------- */
 .status, .toast {
@@ -134,8 +134,10 @@ a { color: var(--sign); }
 .card {
   position: fixed; z-index: 4;
   left: calc(12px + var(--safe-l));
-  bottom: calc(84px + var(--safe-b));
+  bottom: calc(var(--controls-h, 56px) + 26px + var(--safe-b));
   width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - var(--controls-h, 56px) - 150px);
+  overflow-y: auto;
   background: var(--night-a);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-radius: 18px;
@@ -176,13 +178,7 @@ a { color: var(--sign); }
 .seg.sound { box-shadow: inset 0 0 0 1px var(--line); margin-left: 4px; }
 .seg.sound.is-on { background: transparent; color: var(--sign); box-shadow: inset 0 0 0 1px var(--sign); }
 
-.credits-btn {
-  position: fixed; z-index: 3;
-  right: calc(10px + var(--safe-r)); bottom: calc(18px + var(--safe-b));
-  background: none; border: 0; color: var(--ink-2); font-size: 11px; cursor: pointer;
-  text-decoration: underline; text-underline-offset: 3px;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-}
+
 
 /* ---------- Finestrino ---------- */
 .window {
@@ -227,8 +223,6 @@ a { color: var(--sign); }
 /* Quando sei a bordo, i pannelli si appoggiano alla parete della cabina */
 body.riding .status { color: var(--night); text-shadow: none; font-weight: 700; }
 body.riding.porthole .status { color: var(--ink); }
-body.riding .credits-btn { color: var(--night); text-shadow: none; }
-body.riding.porthole .credits-btn { color: var(--ink-2); }
 
 /* ---------- Finestre di dialogo ---------- */
 .sheet {
@@ -259,13 +253,32 @@ body.riding.porthole .credits-btn { color: var(--ink-2); }
 .credits { margin: 0; padding-left: 1.1em; font-size: var(--step--1); }
 .credits li { margin-bottom: 8px; }
 .note { margin-top: 12px !important; }
+.credits-sub { margin: 18px 0 8px; font-size: var(--step-0); }
+.cesium-credits { font-size: 11px; color: var(--ink-2); line-height: 1.6; }
+.cesium-credits a { color: var(--ink-2); }
+.cesium-credits .cesium-credit-logoContainer { display: block; margin-bottom: 6px; }
 
-/* ---------- Schermi piccoli ---------- */
+/* ---------- Schermi piccoli (telefono) ---------- */
 @media (max-width: 560px) {
   .wordmark { display: none; }
-  .place { max-width: 52vw; }
-  .card { left: 50%; transform: translateX(-50%); }
-  .seg { padding: 9px 11px; }
+  .place { max-width: none; flex: 1 1 auto; min-width: 0; padding: 8px 12px; }
+  .weather { margin-left: 0; padding: 8px 12px; }
+  .status { font-size: 12px; top: calc(56px + var(--safe-t)); right: 12px; max-width: none; }
+  .toast { top: calc(110px + var(--safe-t)); right: 12px; max-width: none; }
+  .card { left: 50%; transform: translateX(-50%); padding: 14px 16px 14px; }
+  .card-data { margin-bottom: 10px; }
+
+  /* Comandi: tutta la larghezza; a bordo vanno su due righe */
+  .controls { left: 8px; right: 8px; transform: none; max-width: none; display: flex; justify-content: center; bottom: calc(10px + var(--safe-b)); }
+  .group { flex-wrap: wrap; justify-content: center; border-radius: 24px; gap: 4px; }
+  .seg { padding: 8px 12px; font-size: 15px; min-height: 40px; }
+  #ride-controls { width: 100%; }
+  #ride-controls .seg[data-view] { flex: 1 1 28%; }
+  #ride-controls .sound, #ride-controls .primary { flex: 1 1 40%; margin-left: 0; }
+  .group .primary { font-size: 15px; }
+
+  .pane { width: min(70vw, 420px); height: min(62dvh, 560px); }
+  .window.is-porthole .pane { width: min(86vw, 520px); height: min(86vw, 520px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

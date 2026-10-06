@@ -71,6 +71,8 @@ const viewer = new C.Viewer('globe', {
   infoBox: false,
   selectionIndicator: false,
   scene3DOnly: true,
+  // I crediti della mappa stanno nella finestra "Fonti dei dati", non sopra la vista
+  creditContainer: document.getElementById('cesium-credits'),
 });
 
 const scene = viewer.scene;
@@ -932,3 +934,9 @@ if (saved) {
 startAutoUpdate(() => state.mode !== 'ride' && state.mode !== 'arriving', toast).then((v) => {
   if (v) $('app-version').textContent = `Versione ${v}.`;
 });
+
+// ---------------------------------------------------------------- altezza dei comandi (per non coprirli con la scheda)
+const controlsEl = $('controls');
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--controls-h', `${controlsEl.offsetHeight}px`);
+}).observe(controlsEl);

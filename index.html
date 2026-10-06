@@ -18,7 +18,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
   <div id="globe" aria-label="Vista 3D del cielo e della Terra"></div>
@@ -47,6 +47,7 @@
     <span class="wordmark">Finestrino</span>
     <button id="place" class="place" title="Cambia luogo"></button>
     <span id="weather" class="weather"></span>
+    <button id="credits-btn" class="info" aria-label="Fonti dei dati" title="Fonti dei dati" hidden>i</button>
   </header>
 
   <p id="status" class="status" role="status" hidden></p>
@@ -76,7 +77,6 @@
     </div>
   </nav>
 
-  <button id="credits-btn" class="credits-btn" hidden>Fonti dei dati</button>
 
   <!-- Ricerca luogo -->
   <dialog id="place-dialog" class="sheet">
@@ -109,12 +109,14 @@
       <p class="note">Non usare Finestrino per navigare: le posizioni possono essere in ritardo o mancare.</p>
       <p class="note">Il rumore di cabina è generato dal vivo nel browser, senza file audio.</p>
       <p class="note" id="app-version"></p>
+      <h3 class="credits-sub">Attribuzioni della mappa</h3>
+      <div id="cesium-credits" class="cesium-credits"></div>
       <div class="sheet-actions">
         <button type="button" class="primary" id="credits-close">Chiudi</button>
       </div>
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=7"></script>
+  <script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>
