@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" translate="no">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Finestrino</title>
   <meta name="description" content="Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.">
   <meta name="theme-color" content="#0E1B2C">
+  <meta name="google" content="notranslate">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="it_IT">
   <meta property="og:locale:alternate" content="en_GB">
@@ -18,6 +19,10 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Finestrino">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +33,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
   <div id="globe" aria-label="Vista 3D del cielo e della Terra" data-i18n-attr="aria-label"></div>
@@ -175,6 +180,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=14"></script>
+  <script type="module" src="js/app.js?v=15"></script>
 </body>
 </html>
