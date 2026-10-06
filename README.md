@@ -31,12 +31,34 @@ python3 -m http.server 8000
 
 Aprire `index.html` con doppio clic non funziona: i moduli JavaScript richiedono un server, anche locale.
 
+## Attivare gli aerei (intermediario gratuito su Vercel)
+
+Le fonti dei dati degli aerei non permettono richieste dirette da una pagina web di un altro sito (blocco CORS). Serve un piccolo intermediario: la cartella `finestrino-proxy`, una funzione che gira gratis su Vercel (piano Hobby, uso personale non commerciale, senza carta di credito: oltre i limiti si ferma, non addebita nulla). Prova nell'ordine adsb.lol, adsb.fi e OpenSky Network.
+
+Cloudflare Workers non va bene: adsb.lol risponde 429 e adsb.fi blocca i server Cloudflare.
+
+Da terminale (serve Node.js):
+
+```bash
+cd finestrino-proxy
+npx vercel login
+npx vercel deploy --prod --yes
+```
+
+Il comando stampa un indirizzo come `https://finestrino-proxy.vercel.app`. Scrivilo in `js/config.js`:
+
+```js
+export const AIRCRAFT_PROXY = 'https://finestrino-proxy.vercel.app';
+```
+
+Se pubblichi l'app su un dominio diverso, aggiungilo alla lista `ALLOWED` in `finestrino-proxy/api/point.js` e ripeti il deploy.
+
 ## Da dove vengono i dati, e perché è tutto gratis
 
 | Cosa | Fonte | Condizioni |
 | --- | --- | --- |
 | Aerei | [ADSB.lol](https://adsb.lol) | API aperta, dati ODbL. L'autore ha annunciato che in futuro potrebbe servire una chiave, ottenibile inviando dati con un proprio ricevitore. |
-| Aerei (riserva) | [adsb.fi](https://adsb.fi) | Uso personale non commerciale, massimo 1 richiesta al secondo, va citato. L'app rispetta il limite. |
+| Aerei (riserva) | [adsb.fi](https://adsb.fi) e [OpenSky Network](https://opensky-network.org) | Uso personale non commerciale, massimo 1 richiesta al secondo, va citato. L'app rispetta il limite. |
 | Satelliti | [CelesTrak](https://celestrak.org) + [satellite.js](https://github.com/shashwatak/satellite-js) | Dati scaricati al massimo una volta ogni 2 ore per browser, come chiede CelesTrak. |
 | Immagini della Terra | [Sentinel-2 cloudless di EOX](https://s2maps.eu) | Gratis per uso non commerciale con attribuzione. |
 | Rilievo 3D | Terrain Tiles di Mapzen su AWS Open Data | Gratis, nessuna chiave. |
@@ -64,6 +86,8 @@ js/aircraft.js        dati degli aerei e stima della posizione tra un aggiorname
 js/satellites.js      orbite e posizioni dei satelliti
 js/weather.js         meteo e ricerca luoghi
 js/geo.js             funzioni geografiche
+js/config.js          indirizzo del Worker per gli aerei
+finestrino-proxy/     intermediario gratuito per i dati degli aerei (Vercel)
 manifest.webmanifest  installazione come app
 ```
 

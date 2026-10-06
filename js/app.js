@@ -287,8 +287,9 @@ async function pollPlanes() {
       state.planeSource = res.source;
       state.planeFetchedAt = Date.now();
       state.planeError = false;
-    } catch {
+    } catch (e) {
       state.planeError = true;
+      state.planeNeedsProxy = !!e?.needsProxy;
     }
     updateStatus();
   }
@@ -565,7 +566,9 @@ function updateStatus() {
   }
 
   if (state.planeError && !state.planeFetchedAt) {
-    el.textContent = 'Non riesco a raggiungere i dati degli aerei. Riprovo tra pochi secondi.';
+    el.textContent = state.planeNeedsProxy
+      ? 'Aerei non disponibili: il browser blocca le fonti dirette. Configura il Worker gratuito in js/config.js (vedi README).'
+      : 'Il Worker degli aerei non risponde. Riprovo tra pochi secondi.';
     return;
   }
   const n = state.planes.size;

@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/point/:lat/:lon/:nm", "destination": "/api/point?lat=:lat&lon=:lon&nm=:nm" }
+  ]
+}

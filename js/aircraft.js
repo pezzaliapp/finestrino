@@ -4,6 +4,7 @@
 // airplanes.live NON è usato: richiede di contattarli anche per l'uso non commerciale.
 
 import { destination, lerpAngle, wrapLon } from './geo.js';
+import { AIRCRAFT_PROXY } from './config.js';
 
 const SOURCES = [
   {
@@ -19,33 +20,54 @@ const SOURCES = [
 let preferred = 0;
 let lastRequest = 0;
 
+async function getJson(url, timeoutMs = 9000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return { json: await res.json(), source: res.headers.get('X-Finestrino-Source') };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function toResult(json, source) {
+  const raw = json.ac || json.aircraft || [];
+  const received = Date.now();
+  return { source, list: raw.map((a) => normalize(a, received)).filter(Boolean) };
+}
+
 export async function fetchAircraft(lat, lon, radiusNm) {
   // Rispetta il limite più severo (adsb.fi: 1 richiesta al secondo)
   const wait = 1100 - (Date.now() - lastRequest);
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastRequest = Date.now();
+  const nm = Math.round(radiusNm);
 
+  // 1) Il tuo Cloudflare Worker gratuito, se configurato in js/config.js
+  if (AIRCRAFT_PROXY) {
+    const base = AIRCRAFT_PROXY.replace(/\/+$/, '');
+    const { json, source } = await getJson(`${base}/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${nm}`);
+    return toResult(json, source || 'adsb.lol');
+  }
+
+  // 2) Collegamento diretto (funziona solo se la fonte permette richieste dal browser)
   let lastError;
   for (let k = 0; k < SOURCES.length; k++) {
     const i = (preferred + k) % SOURCES.length;
     const src = SOURCES[i];
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 9000);
     try {
-      lastRequest = Date.now();
-      const res = await fetch(src.url(lat, lon, Math.round(radiusNm)), { signal: ctrl.signal });
-      if (!res.ok) throw new Error(`${src.name}: HTTP ${res.status}`);
-      const json = await res.json();
-      const raw = json.ac || json.aircraft || [];
-      const received = Date.now();
+      const { json } = await getJson(src.url(lat, lon, nm));
       preferred = i;
-      return { source: src.name, list: raw.map((a) => normalize(a, received)).filter(Boolean) };
+      return toResult(json, src.name);
     } catch (e) {
       lastError = e;
-    } finally {
-      clearTimeout(timer);
     }
   }
-  throw lastError || new Error('Nessuna fonte disponibile');
+  const err = lastError || new Error('Nessuna fonte disponibile');
+  err.needsProxy = true;
+  throw err;
 }
 
 function num(v) {
