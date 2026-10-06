@@ -36,6 +36,7 @@ const state = {
   sats: new Map(),           // id  -> { name, satrec, entity, pos }
   ships: new Map(),          // mmsi -> { data, entity }
   shipError: false,
+  shipFetchedAt: 0,
   shipTimer: null,
   selected: null,            // id entità
   planeSource: '',
@@ -398,7 +399,22 @@ function addShipEntity(mmsi, d) {
   });
 }
 
-function mergeShips(list) {
+const SHIPS_KEY = 'finestrino.ships.v1';
+
+function saveShips() {
+  try {
+    localStorage.setItem(SHIPS_KEY, JSON.stringify([...state.ships.values()].map((h) => h.data)));
+  } catch { /* spazio pieno */ }
+}
+
+function restoreShips() {
+  try {
+    const list = JSON.parse(localStorage.getItem(SHIPS_KEY) || '[]');
+    if (Array.isArray(list) && list.length) mergeShips(list, false);
+  } catch { /* dati non validi */ }
+}
+
+function mergeShips(list, save = true) {
   for (const d of list) {
     const h = state.ships.get(d.mmsi);
     if (h) {
@@ -417,21 +433,22 @@ function mergeShips(list) {
       state.ships.delete(mmsi);
     }
   }
+  if (save) saveShips();
 }
 
 function shipCenter() {
   if (state.mode === 'ride') {
     const pose = ridePose();
-    if (pose) return { lat: pose.lat, lon: pose.lon, nm: state.ride.kind === 'sat' ? 150 : 110 };
+    if (pose) return { lat: pose.lat, lon: pose.lon, nm: 150 };
   }
   if (state.mode === 'map') {
     const c = camera.pickEllipsoid(new C.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
     if (c) {
       const g = C.Cartographic.fromCartesian(c);
-      return { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude), nm: 80 };
+      return { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude), nm: 150 };
     }
   }
-  return { lat: state.home.lat, lon: state.home.lon, nm: 120 };
+  return { lat: state.home.lat, lon: state.home.lon, nm: 150 };
 }
 
 async function pollShips() {
@@ -441,6 +458,7 @@ async function pollShips() {
     try {
       mergeShips(await fetchShips(c.lat, c.lon, c.nm));
       state.shipError = false;
+      state.shipFetchedAt = Date.now();
     } catch {
       state.shipError = true;
     }
@@ -707,14 +725,19 @@ function updateStatus() {
   }
   const n = state.planes.size;
   const age = state.planeFetchedAt ? Math.round((Date.now() - state.planeFetchedAt) / 1000) : null;
-  const parts = [n === 1 ? '1 aereo' : `${n} aerei`];
-  if (state.ships.size) parts.push(state.ships.size === 1 ? '1 nave' : `${state.ships.size} navi`);
-  if (state.sats.size) parts.push(`${state.sats.size} satelliti`);
-  let text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)} tracciati` : `${parts[0]} in zona`;
+  let text = `${n === 1 ? '1 aereo' : `${n} aerei`} e ${state.sats.size} satelliti tracciati`;
   if (age !== null) text += `. Dati ${state.planeSource}, aggiornati ${age} s fa`;
   if (state.satError) text += '. Satelliti non disponibili ora';
-  if (state.shipError && !state.ships.size) text += '. Navi non disponibili ora';
-  el.textContent = text + '.';
+
+  // Riga delle navi: sempre presente, così si capisce cosa sta succedendo
+  const ns = state.ships.size;
+  let ships;
+  if (ns) ships = ns === 1 ? '1 nave sul mare' : `${ns} navi sul mare`;
+  else if (state.shipError) ships = 'Navi non disponibili ora, riprovo tra 30 secondi';
+  else if (!state.shipFetchedAt) ships = 'Navi in arrivo…';
+  else ships = 'Nessuna nave ricevuta finora: in questa zona i ricevitori AIS sono pochi, continuo ad ascoltare';
+  text += `.\n${ships}`;
+  el.textContent = text.endsWith('…') ? text : text + '.';
 }
 
 let toastTimer = null;
@@ -756,6 +779,8 @@ async function setHome(lat, lon, name) {
   state.planeFetchedAt = 0;
   for (const h of state.ships.values()) viewer.entities.remove(h.entity);
   state.ships.clear();
+  state.shipFetchedAt = 0;
+  restoreShips();
 
   $('intro').hidden = true;
   $('topbar').hidden = false;

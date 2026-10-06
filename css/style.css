@@ -124,7 +124,7 @@ a { color: var(--sign); }
   font-variant-numeric: tabular-nums;
   max-width: min(420px, calc(100vw - 24px));
 }
-.status { top: calc(60px + var(--safe-t)); color: var(--ink); text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.status { white-space: pre-line; top: calc(60px + var(--safe-t)); color: var(--ink); text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .toast {
   top: calc(96px + var(--safe-t));
   background: var(--sign); color: var(--sign-ink); padding: 8px 14px; border-radius: 10px; font-weight: 700;
