@@ -139,7 +139,11 @@ viewer.cesiumWidget.screenSpaceEventHandler.removeInputAction(C.ScreenSpaceEvent
 
 const clouds = scene.primitives.add(new C.CloudCollection());
 
-camera.setView({ destination: C.Cartesian3.fromDegrees(12, 28, 19000000) });
+// Inquadratura iniziale: la Terra con il confine tra giorno e notte, così si vedono sia la luce sia le città illuminate.
+// Il Sole è a picco sulla longitudine dove è mezzogiorno; ci mettiamo 70° più a est, dove sta facendo sera.
+const subsolarLon = (12 - (Date.now() % 86400000) / 3600000) * 15;
+const introLon = ((subsolarLon + 70 + 540) % 360) - 180;
+camera.setView({ destination: C.Cartesian3.fromDegrees(introLon, 28, 19000000) });
 setFov(state.fov);
 
 // ---------------------------------------------------------------- camera

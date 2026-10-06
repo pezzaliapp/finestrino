@@ -273,6 +273,10 @@ body.riding.porthole .status { color: var(--ink); }
 .note { margin-top: 12px !important; }
 .lang-switch { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(244,246,248,0.06); margin-bottom: 14px; }
 .lang-switch .seg { min-height: 34px; padding: 6px 14px; font-size: var(--step--1); }
+.intro-lang {
+  position: absolute; top: calc(16px + var(--safe-t)); right: calc(16px + var(--safe-r));
+  margin: 0; background: var(--night-a); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
 .credits-sub { margin: 18px 0 8px; font-size: var(--step-0); }
 .cesium-credits { font-size: 11px; color: var(--ink-2); line-height: 1.6; }
 .cesium-credits a { color: var(--ink-2); }

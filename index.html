@@ -28,7 +28,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=12">
+  <link rel="stylesheet" href="css/style.css?v=13">
 </head>
 <body>
   <div id="globe" aria-label="Vista 3D del cielo e della Terra" data-i18n-attr="aria-label"></div>
@@ -40,6 +40,10 @@
 
   <!-- Schermata iniziale -->
   <section id="intro" class="intro">
+    <div class="lang-switch intro-lang" role="group" aria-label="Lingua / Language">
+      <button type="button" class="seg" data-lang="it">IT</button>
+      <button type="button" class="seg" data-lang="en">EN</button>
+    </div>
     <div class="intro-inner">
       <h1 class="intro-title">Finestrino</h1>
       <p class="intro-lede" id="intro-lede" data-i18n>Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.</p>
@@ -171,6 +175,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=12"></script>
+  <script type="module" src="js/app.js?v=13"></script>
 </body>
 </html>
