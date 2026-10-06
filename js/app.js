@@ -2,7 +2,8 @@
 // Tutto gratuito: nessuna chiave API, nessun abbonamento, nessun server.
 
 import { createTerrainProvider, sampleHeight } from './terrain.js';
-import { fetchAircraft, aircraftPosition } from './aircraft.js';
+import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
+import { findFlight, knownRoute, placeName } from './flights.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
 import { fetchWeather, describeWeather, searchPlaces } from './weather.js';
 import { bearing, destination, distanceM, clamp, fmt0, fmt1, compass } from './geo.js';
@@ -322,6 +323,31 @@ function mergePlanes(list) {
   }
 }
 
+/** Aggiunge o aggiorna un singolo aereo (per esempio trovato con la ricerca) senza toccare gli altri. */
+function upsertPlane(d) {
+  const h = state.planes.get(d.hex);
+  if (h) {
+    d.blend = { from: aircraftPosition(h.data, Date.now()), start: Date.now() };
+    h.data = d;
+    h.missed = 0;
+    h.entity.label.text = planeLabel(d);
+  } else {
+    state.planes.set(d.hex, { data: d, missed: 0, entity: addPlaneEntity(d.hex, d) });
+  }
+}
+
+/** Nome del volo da mostrare: il numero commerciale se lo conosciamo (FR1234), altrimenti il codice radio. */
+function flightName(d) {
+  const rt = d.callsign ? knownRoute(d.callsign) : null;
+  return (rt && rt.flight) || planeLabel(d);
+}
+
+function routeText(d) {
+  const rt = d.callsign ? knownRoute(d.callsign) : null;
+  if (!rt || !rt.origin || !rt.destination) return '';
+  return `${placeName(rt.origin)} → ${placeName(rt.destination)}`;
+}
+
 function pollCenter() {
   if (state.mode === 'ride' && state.ride?.kind === 'plane') {
     const pose = ridePose();
@@ -594,20 +620,23 @@ function renderCard() {
   if (!id) return;
   const [kind, key] = id.split(':');
   const h = state.home;
-  let title = '', sub = '', rows = '';
+  let title = '', sub = '', rows = '', route = '';
 
   if (kind === 'plane') {
     const p = state.planes.get(key);
     if (!p) return closeCard();
     const d = p.data;
     const pos = aircraftPosition(d, Date.now());
-    title = planeLabel(d);
-    sub = [d.desc || d.type, d.operator].filter(Boolean).join(', ') || 'Aereo in volo';
+    const rt = d.callsign ? knownRoute(d.callsign) : null;
+    title = flightName(d);
+    route = routeText(d);
+    sub = [rt && rt.airline, d.desc || d.type].filter(Boolean).join(', ') || 'Aereo in volo';
     rows += row('Quota', `${fmt0(pos.alt)} m`);
     if (d.gsKt !== null) rows += row('Velocità', `${fmt0(d.gsKt * 1.852)} km/h`);
     if (d.track !== null) rows += row('Direzione', `verso ${compass(d.track)}`);
     rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
-    if (d.reg) rows += row('Registrazione', d.reg);
+    if (d.callsign && title !== d.callsign) rows += row('Codice radio', escapeHtml(d.callsign));
+    if (d.reg) rows += row('Registrazione', escapeHtml(d.reg));
   } else if (kind === 'ship') {
     const sh = state.ships.get(Number(key));
     if (!sh) return closeCard();
@@ -633,6 +662,8 @@ function renderCard() {
   }
 
   $('board').hidden = kind === 'ship'; // sulle navi non si sale (per ora)
+  $('card-share').hidden = kind === 'ship';
+  $('card-route').textContent = route;
   $('card-title').textContent = title;
   $('card-sub').textContent = sub;
   $('card-data').innerHTML = rows;
@@ -756,7 +787,8 @@ function updateStatus() {
     if (pose && r.kind === 'plane') {
       const d = state.planes.get(r.id)?.data;
       const speed = d?.gsKt ? `, ${fmt0(d.gsKt * 1.852)} km/h` : '';
-      el.textContent = `A bordo di ${planeLabel(d)}, ${fmt0(pose.alt)} m${speed}, verso ${compass(pose.heading)}`;
+      const route = routeText(d);
+      el.textContent = `A bordo di ${flightName(d)}${route ? `, ${route}` : ''}\n${fmt0(pose.alt)} m${speed}, verso ${compass(pose.heading)}`;
     } else if (pose) {
       el.textContent = `A bordo di ${state.sats.get(r.id).name}, ${fmt0(pose.alt / 1000)} km di quota`;
     }
@@ -811,11 +843,11 @@ function readHome() {
 
 let started = false;
 
-async function setHome(lat, lon, name) {
+async function setHome(lat, lon, name, opts = {}) {
   $('intro-msg').textContent = 'Preparo il cielo sopra di te…';
   const ground = await sampleHeight(lat, lon).catch(() => 0);
   state.home = { lat, lon, name, ground };
-  saveHome(state.home);
+  if (opts.save !== false) saveHome(state.home);
   $('place').textContent = name;
 
   if (state.ride) endRide();
@@ -844,8 +876,8 @@ async function setHome(lat, lon, name) {
       roll: 0,
     },
     duration: reducedMotion ? 0 : 4.5,
-    complete: () => setMode('sky'),
-    cancel: () => setMode('sky'),
+    complete: () => { setMode('sky'); if (opts.onArrive) opts.onArrive(); },
+    cancel: () => { setMode('sky'); if (opts.onArrive) opts.onArrive(); },
   });
 
   loadWeather();
@@ -940,3 +972,165 @@ const controlsEl = $('controls');
 new ResizeObserver(() => {
   document.documentElement.style.setProperty('--controls-h', `${controlsEl.offsetHeight}px`);
 }).observe(controlsEl);
+
+// ---------------------------------------------------------------- cerca un volo
+function openFindDialog() {
+  $('find-results').innerHTML = '';
+  $('find-input').value = '';
+  $('find-dialog').showModal();
+  $('find-input').focus();
+}
+
+function boardFound(d) {
+  if ($('find-dialog').open) $('find-dialog').close();
+  upsertPlane(d);
+  knownRoute(d.callsign);
+  startRide(`plane:${d.hex}`);
+}
+
+$('find-btn').addEventListener('click', openFindDialog);
+$('find-cancel').addEventListener('click', () => $('find-dialog').close());
+$('find-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = $('find-input').value.trim();
+  const list = $('find-results');
+  if (!q) return;
+  list.innerHTML = '<li><p>Cerco nel cielo…</p></li>';
+  try {
+    const raw = await findFlight(q);
+    const flying = raw.map(normalizeAircraft).filter(Boolean);
+    if (!raw.length) {
+      list.innerHTML = '<li><p>Nessun aereo in volo con questo codice. Forse non è ancora decollato o è già atterrato, oppure la compagnia usa via radio un codice diverso: prova quello che vedi sul tabellone o su un sito di voli.</p></li>';
+      return;
+    }
+    if (!flying.length) {
+      list.innerHTML = '<li><p>L\'ho trovato, ma in questo momento è a terra. Riprova quando sarà decollato.</p></li>';
+      return;
+    }
+    if (flying.length === 1) return boardFound(flying[0]);
+    list.innerHTML = '';
+    for (const d of flying) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `${escapeHtml(planeLabel(d))}<small>${escapeHtml([d.desc || d.type, `${fmt0(d.altM)} m`].filter(Boolean).join(', '))}</small>`;
+      b.addEventListener('click', () => boardFound(d));
+      li.append(b);
+      list.append(li);
+    }
+  } catch {
+    list.innerHTML = '<li><p>La ricerca non risponde. Controlla la connessione e riprova.</p></li>';
+  }
+});
+
+// ---------------------------------------------------------------- condividi
+function shareKey() {
+  if (state.mode === 'ride' && state.ride) return [state.ride.kind, state.ride.id];
+  if (state.selected) return state.selected.split(':');
+  return [null, null];
+}
+
+async function shareCurrent() {
+  const [kind, key] = shareKey();
+  if (!kind || kind === 'ship') return;
+  const url = new URL(location.pathname, location.origin);
+  let text;
+  if (kind === 'plane') {
+    const d = state.planes.get(key)?.data;
+    if (!d) return;
+    url.searchParams.set('volo', key);
+    if (d.callsign) url.searchParams.set('cs', d.callsign);
+    const rt = d.callsign ? knownRoute(d.callsign) : null;
+    const alt = fmt0(aircraftPosition(d, Date.now()).alt);
+    const from = rt?.origin && (rt.origin.city || rt.origin.name);
+    const to = rt?.destination && (rt.destination.city || rt.destination.name);
+    text = from && to
+      ? `Sono al finestrino del volo ${flightName(d)} da ${from} a ${to}, a ${alt} metri. Vieni a guardare in diretta:`
+      : `Sono al finestrino del volo ${flightName(d)}, a ${alt} metri. Vieni a guardare in diretta:`;
+  } else {
+    const s = state.sats.get(key);
+    if (!s) return;
+    url.searchParams.set('sat', key);
+    const alt = s.pos ? `, a ${fmt0(s.pos.alt / 1000)} km dalla Terra` : '';
+    text = `Sono a bordo di ${s.name}${alt}. Vieni a guardare in diretta:`;
+  }
+  const link = url.toString();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Finestrino', text, url: link });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(`${text} ${link}`);
+    toast('Link copiato: incollalo in un messaggio.');
+  } catch {
+    window.prompt('Copia questo link:', link);
+  }
+}
+
+$('share').addEventListener('click', shareCurrent);
+$('card-share').addEventListener('click', shareCurrent);
+
+// ---------------------------------------------------------------- aprire un link condiviso
+const params = new URLSearchParams(location.search);
+const linkPlane = params.get('volo');
+const linkCs = params.get('cs');
+const linkSat = params.get('sat');
+
+function clearLink() {
+  history.replaceState(null, '', location.pathname);
+}
+
+async function waitSat(id) {
+  for (let i = 0; i < 60; i++) {
+    if (state.sats.get(id)?.pos) return startRide(`sat:${id}`);
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  toast('Non trovo più questo satellite. Guarda il cielo sopra di te.');
+}
+
+async function joinFromLink() {
+  const msg = $('intro-msg');
+  const btn = $('join-link');
+  btn.disabled = true;
+  try {
+    if (linkPlane) {
+      msg.textContent = 'Cerco il volo…';
+      let raw = await findFlight(linkPlane).catch(() => []);
+      if (!raw.length && linkCs) raw = await findFlight(linkCs).catch(() => []);
+      const d = raw.map(normalizeAircraft).find(Boolean);
+      if (!d) {
+        msg.textContent = 'Questo volo non è più in aria: probabilmente è atterrato. Puoi guardare il cielo sopra di te.';
+        btn.hidden = true;
+        $('use-location').classList.replace('ghost', 'primary');
+        clearLink();
+        return;
+      }
+      const home = saved || { lat: d.lat, lon: d.lon, name: 'Sotto il volo' };
+      clearLink();
+      await setHome(home.lat, home.lon, home.name, {
+        save: !!saved,
+        onArrive: () => boardFound(d),
+      });
+    } else if (linkSat) {
+      msg.textContent = 'Preparo il viaggio in orbita…';
+      const home = saved || { lat: 41.9, lon: 12.5, name: 'Italia' };
+      clearLink();
+      await setHome(home.lat, home.lon, home.name, { save: !!saved, onArrive: () => waitSat(linkSat) });
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+if (linkPlane || linkSat) {
+  $('intro-lede').textContent = linkPlane
+    ? `Ti hanno invitato al finestrino del volo ${(linkCs || linkPlane).toUpperCase()}, in diretta. Tocca il pulsante e sali a bordo.`
+    : 'Ti hanno invitato a bordo di un satellite, in diretta. Tocca il pulsante e parti.';
+  $('join-link').hidden = false;
+  $('use-location').classList.replace('primary', 'ghost');
+  $('join-link').addEventListener('click', joinFromLink);
+}

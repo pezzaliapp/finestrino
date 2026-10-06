@@ -1,9 +1,25 @@
 {
   "functions": {
-    "api/ships.js": { "maxDuration": 25 }
+    "api/ships.js": {
+      "maxDuration": 25
+    }
   },
   "rewrites": [
-    { "source": "/point/:lat/:lon/:nm", "destination": "/api/point?lat=:lat&lon=:lon&nm=:nm" },
-    { "source": "/ships/:lat/:lon/:nm", "destination": "/api/ships?lat=:lat&lon=:lon&nm=:nm" }
+    {
+      "source": "/point/:lat/:lon/:nm",
+      "destination": "/api/point?lat=:lat&lon=:lon&nm=:nm"
+    },
+    {
+      "source": "/ships/:lat/:lon/:nm",
+      "destination": "/api/ships?lat=:lat&lon=:lon&nm=:nm"
+    },
+    {
+      "source": "/find/:q",
+      "destination": "/api/find?q=:q"
+    },
+    {
+      "source": "/route/:cs",
+      "destination": "/api/route?cs=:cs"
+    }
   ]
 }

@@ -9,6 +9,9 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Dal basso**: sei nel tuo luogo e guardi il cielo. Trascina per guardarti intorno, pizzica o usa la rotella per zoomare.
 - **Dall'alto**: esplori la zona come su una mappa 3D e scegli un aereo.
 - **A bordo**: finestrino sinistro, destro o vista avanti. Puoi guardarti intorno trascinando.
+- **Cerca un volo**: scrivi il numero del volo (FR1234), il codice radio (RYR4KX) o la registrazione (EI-DYC) e sali direttamente a bordo.
+- **Da dove viene e dove va**: nella scheda e a bordo compaiono compagnia, partenza e arrivo (es. Bergamo → Bari).
+- **Condividi il finestrino**: un link che porta chi lo apre sullo stesso aereo o satellite, in diretta. Con anteprima per WhatsApp, Telegram e social.
 - **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità e destinazione. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
 - **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
 - **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
@@ -83,6 +86,7 @@ npx vercel deploy --prod --yes
 | --- | --- | --- |
 | Aerei | [ADSB.lol](https://adsb.lol) | API aperta, dati ODbL. L'autore ha annunciato che in futuro potrebbe servire una chiave, ottenibile inviando dati con un proprio ricevitore. |
 | Aerei (riserva) | [adsb.fi](https://adsb.fi) e [OpenSky Network](https://opensky-network.org) | Uso personale non commerciale, massimo 1 richiesta al secondo, va citato. L'app rispetta il limite. |
+| Rotte dei voli | [adsbdb](https://www.adsbdb.com) | Gratuito. Dati delle rotte di David Taylor e Jim Mason: mostrati a ogni richiesta, mai copiati in un nostro database. |
 | Navi | [aisstream.io](https://aisstream.io) | Gratuito per uso non commerciale con una chiave personale, che resta nascosta su Vercel (variabile `AISSTREAM_KEY`). Posizioni con 1-3 minuti di ritardo. |
 | Satelliti | [CelesTrak](https://celestrak.org) + [satellite.js](https://github.com/shashwatak/satellite-js) | Dati scaricati al massimo una volta ogni 2 ore per browser, come chiede CelesTrak. |
 | Immagini della Terra | [Sentinel-2 cloudless di EOX](https://s2maps.eu) | Gratis per uso non commerciale con attribuzione. |
@@ -119,6 +123,8 @@ js/update.js          controllo nuove versioni
 sw.js                 service worker: file sempre aggiornati, copia offline
 version.json          numero di versione (lo aggiorna pubblica.sh)
 pubblica.sh           pubblica una modifica con un comando
+js/flights.js         ricerca dei voli e rotte
+og-image.png          anteprima per i social
 manifest.webmanifest  installazione come app
 ```
 

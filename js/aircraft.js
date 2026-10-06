@@ -70,6 +70,11 @@ export async function fetchAircraft(lat, lon, radiusNm) {
   throw err;
 }
 
+/** Converte un aereo grezzo (adsb.lol / adsb.fi) nel formato dell'app. null se è a terra o senza posizione. */
+export function normalizeAircraft(a) {
+  return normalize(a, Date.now());
+}
+
 function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
