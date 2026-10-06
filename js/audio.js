@@ -1,12 +1,36 @@
 // Rumore di cabina generato dal vivo con Web Audio: nessun file audio, nessun diritto d'autore.
-// Ricetta: rombo d'aria (rumore "marrone" filtrato) + fruscio leggero + ronzio dei motori
-// con un battimento lento, e una variazione lentissima come in un volo vero.
+// Ricetta: fruscio d'aria (rumore rosa) + rombo profondo (rumore marrone) + ronzio dei motori
+// + sibilo della ventilazione, con una variazione lentissima come in un volo vero.
 
 let ctx = null;
 let master = null;
 let built = false;
-const VOLUME = 0.55;
+const VOLUME = 0.9;
 
+// Rumore "rosa": più medi del rumore marrone, quindi si sente anche dagli altoparlanti di un portatile
+function pinkNoiseBuffer(seconds) {
+  const length = Math.floor(ctx.sampleRate * seconds);
+  const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buffer.getChannelData(ch);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < length; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.0168980;
+      data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+    smoothLoop(data);
+  }
+  return buffer;
+}
+
+// Rumore "marrone": il rombo profondo, per chi usa le cuffie
 function brownNoiseBuffer(seconds) {
   const length = Math.floor(ctx.sampleRate * seconds);
   const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
@@ -14,77 +38,85 @@ function brownNoiseBuffer(seconds) {
     const data = buffer.getChannelData(ch);
     let last = 0;
     for (let i = 0; i < length; i++) {
-      const white = Math.random() * 2 - 1;
-      last = (last + 0.02 * white) / 1.02;
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
       data[i] = last * 3.5;
     }
-    // Raccordo morbido tra fine e inizio per evitare il "clic" del loop
-    const fade = Math.floor(ctx.sampleRate * 0.05);
-    for (let i = 0; i < fade; i++) {
-      const k = i / fade;
-      data[length - fade + i] = data[length - fade + i] * (1 - k) + data[i] * k;
-    }
+    smoothLoop(data);
   }
   return buffer;
 }
 
+// Raccordo morbido tra fine e inizio per evitare il "clic" del loop
+function smoothLoop(data) {
+  const fade = Math.floor(ctx.sampleRate * 0.05);
+  const n = data.length;
+  for (let i = 0; i < fade; i++) {
+    const k = i / fade;
+    data[n - fade + i] = data[n - fade + i] * (1 - k) + data[i] * k;
+  }
+}
+
+function loop(buffer, offset = 0) {
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  src.start(0, offset);
+  return src;
+}
+
+function filter(type, freq, q = 0.7) {
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  f.Q.value = q;
+  return f;
+}
+
+function gain(v) {
+  const g = ctx.createGain();
+  g.gain.value = v;
+  return g;
+}
+
 function build() {
-  master = ctx.createGain();
-  master.gain.value = 0;
-  master.connect(ctx.destination);
+  // Compressore finale: volume pieno senza distorsione
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -18;
+  comp.ratio.value = 4;
+  master = gain(0);
+  master.connect(comp).connect(ctx.destination);
 
-  const noise = brownNoiseBuffer(9);
+  const pink = pinkNoiseBuffer(9);
+  const brown = brownNoiseBuffer(7);
 
-  // Rombo dell'aria sulla fusoliera
-  const roar = ctx.createBufferSource();
-  roar.buffer = noise;
-  roar.loop = true;
-  const roarFilter = ctx.createBiquadFilter();
-  roarFilter.type = 'lowpass';
-  roarFilter.frequency.value = 420;
-  roarFilter.Q.value = 0.5;
-  const roarGain = ctx.createGain();
-  roarGain.gain.value = 0.9;
-  roar.connect(roarFilter).connect(roarGain).connect(master);
+  // 1) Il "fruscio" dell'aria sulla fusoliera: la parte che si sente di più
+  const air = filter('lowpass', 1600, 0.5);
+  loop(pink).connect(filter('highpass', 120)).connect(air).connect(gain(0.75)).connect(master);
 
-  // Variazione lentissima del rombo
+  // Variazione lentissima, come le piccole turbolenze
   const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.07;
-  const lfoDepth = ctx.createGain();
-  lfoDepth.gain.value = 70;
-  lfo.connect(lfoDepth).connect(roarFilter.frequency);
+  lfo.frequency.value = 0.08;
+  const lfoDepth = gain(250);
+  lfo.connect(lfoDepth).connect(air.frequency);
+  lfo.start();
 
-  // Fruscio dell'aria condizionata
-  const hiss = ctx.createBufferSource();
-  hiss.buffer = noise;
-  hiss.loop = true;
-  hiss.loopStart = 3;
-  const hissFilter = ctx.createBiquadFilter();
-  hissFilter.type = 'bandpass';
-  hissFilter.frequency.value = 1400;
-  hissFilter.Q.value = 0.6;
-  const hissGain = ctx.createGain();
-  hissGain.gain.value = 0.05;
-  hiss.connect(hissFilter).connect(hissGain).connect(master);
+  // 2) Il rombo profondo (si apprezza in cuffia)
+  loop(brown, 2).connect(filter('lowpass', 300, 0.5)).connect(gain(0.7)).connect(master);
 
-  // Ronzio dei motori: due toni vicini che "battono" lentamente
-  const engineFilter = ctx.createBiquadFilter();
-  engineFilter.type = 'lowpass';
-  engineFilter.frequency.value = 260;
-  const engineGain = ctx.createGain();
-  engineGain.gain.value = 0.035;
-  engineFilter.connect(engineGain).connect(master);
-  for (const f of [88, 89.3]) {
+  // 3) Il ronzio dei motori: toni vicini che "battono", con armoniche udibili anche dal portatile
+  const engine = filter('bandpass', 260, 0.9);
+  engine.connect(gain(0.05)).connect(master);
+  for (const f of [118, 119.4, 236.5]) {
     const o = ctx.createOscillator();
     o.type = 'sawtooth';
     o.frequency.value = f;
-    o.connect(engineFilter);
+    o.connect(engine);
     o.start();
   }
 
-  roar.start();
-  hiss.start(0, 3);
-  lfo.start();
+  // 4) Il sibilo leggero della ventilazione
+  loop(pink, 4).connect(filter('bandpass', 3200, 0.8)).connect(gain(0.06)).connect(master);
+
   built = true;
 }
 

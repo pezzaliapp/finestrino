@@ -1,9 +1,12 @@
 // Finestrino service worker: prima la rete (versione più recente), la copia salvata solo offline.
 // Gestisce solo i file del sito; mappe, dati e librerie esterne passano senza intervento.
-const CACHE = 'finestrino-v1';
+const CACHE = 'finestrino-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('activate', (e) => e.waitUntil((async () => {
+  for (const key of await caches.keys()) if (key !== CACHE) await caches.delete(key);
+  await self.clients.claim();
+})()));
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
