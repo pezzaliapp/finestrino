@@ -78,6 +78,50 @@ const camera = viewer.camera;
 const controller = scene.screenSpaceCameraController;
 
 scene.globe.enableLighting = true;          // giorno e notte reali
+// Cesium di default "accende la luce" quando la vista è vicina al suolo (sotto i 10.000 km):
+// la spegniamo, così di notte è buio anche dal finestrino e da terra.
+scene.globe.lightingFadeOutDistance = 1;
+scene.globe.lightingFadeInDistance = 2;
+scene.globe.nightFadeOutDistance = 1;
+scene.globe.nightFadeInDistance = 2;
+
+// Luci delle città di notte: NASA Black Marble (GIBS), gratuito e senza chiave.
+// Si vedono solo sul lato notturno della Terra; di giorno restano invisibili.
+const baseLayer = viewer.imageryLayers.get(0);
+baseLayer.dayAlpha = 1;
+baseLayer.nightAlpha = 0.06; // un filo di "luce lunare" per intuire coste e montagne
+
+const NIGHT_SOURCES = [
+  'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
+  'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_CityLights_2012/default/2012-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg',
+  'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png',
+];
+let nightLayer = null;
+
+function addNightLights(i = 0) {
+  if (i >= NIGHT_SOURCES.length) return;
+  const provider = new C.UrlTemplateImageryProvider({
+    url: NIGHT_SOURCES[i],
+    maximumLevel: 8,
+    credit: new C.Credit('Luci notturne: NASA Black Marble (GIBS)', false),
+  });
+  let failures = 0;
+  provider.errorEvent.addEventListener((err) => {
+    failures += 1;
+    if (err) err.retry = false;
+    // Se questa sorgente non risponde, passa alla successiva
+    if (failures === 6) {
+      viewer.imageryLayers.remove(nightLayer, true);
+      addNightLights(i + 1);
+    }
+  });
+  nightLayer = viewer.imageryLayers.addImageryProvider(provider);
+  nightLayer.dayAlpha = 0;
+  nightLayer.nightAlpha = 1;
+  nightLayer.brightness = 1.8; // città ben visibili anche dal finestrino
+  nightLayer.contrast = 1.2;
+}
+addNightLights();
 scene.globe.depthTestAgainstTerrain = true; // ciò che è sotto l'orizzonte resta nascosto
 scene.globe.maximumScreenSpaceError = coarse ? 4 : 2;
 scene.fog.enabled = true;

@@ -12,6 +12,7 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità e destinazione. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
 - **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
 - **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
+- **Notte vera**: giorno e notte seguono l'ora reale. Di notte la Terra è buia e si accendono le luci delle città (NASA Black Marble).
 - **Meteo vero**: temperatura e cielo del tuo luogo, con nuvole disegnate in base alla copertura reale.
 - **Satelliti**: la Stazione Spaziale Internazionale, Tiangong e i ~150 satelliti più luminosi. Dall'oblò del satellite vedi la Terra dall'orbita.
 - Si può installare sul telefono come app (menu del browser, "Aggiungi a schermata Home").
@@ -85,6 +86,7 @@ npx vercel deploy --prod --yes
 | Navi | [aisstream.io](https://aisstream.io) | Gratuito per uso non commerciale con una chiave personale, che resta nascosta su Vercel (variabile `AISSTREAM_KEY`). Posizioni con 1-3 minuti di ritardo. |
 | Satelliti | [CelesTrak](https://celestrak.org) + [satellite.js](https://github.com/shashwatak/satellite-js) | Dati scaricati al massimo una volta ogni 2 ore per browser, come chiede CelesTrak. |
 | Immagini della Terra | [Sentinel-2 cloudless di EOX](https://s2maps.eu) | Gratis per uso non commerciale con attribuzione. |
+| Luci notturne | NASA Black Marble tramite [GIBS](https://earthdata.nasa.gov/gibs) | Gratuito, nessuna chiave, dominio pubblico NASA. Composito annuale, non in diretta. |
 | Rilievo 3D | Terrain Tiles di Mapzen su AWS Open Data | Gratis, nessuna chiave. |
 | Meteo e ricerca luoghi | [Open-Meteo](https://open-meteo.com) | Gratis per uso non commerciale, CC BY 4.0. |
 | Motore 3D | [CesiumJS](https://cesium.com/platform/cesiumjs/) | Apache 2.0. Non usa Cesium ion, quindi nessun token. |
