@@ -1,0 +1,15 @@
+{
+  "name": "Finestrino",
+  "short_name": "Finestrino",
+  "description": "Il cielo sopra di te, dal finestrino di qualsiasi aereo o satellite che ci passa adesso.",
+  "lang": "it",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0E1B2C",
+  "theme_color": "#0E1B2C",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

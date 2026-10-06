@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Finestrino</title>
+  <meta name="description" content="Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.">
+  <meta name="theme-color" content="#0E1B2C">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- CesiumJS (Apache 2.0) dal CDN gratuito jsDelivr. Nessun token Cesium ion necessario. -->
+  <script>window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/';</script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="globe" aria-label="Vista 3D del cielo e della Terra"></div>
+
+  <!-- Il finestrino: appare quando sei a bordo -->
+  <div id="window" class="window" hidden aria-hidden="true">
+    <div class="pane"><div class="shade"></div></div>
+  </div>
+
+  <!-- Schermata iniziale -->
+  <section id="intro" class="intro">
+    <div class="intro-inner">
+      <h1 class="intro-title">Finestrino</h1>
+      <p class="intro-lede">Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.</p>
+      <div class="intro-actions">
+        <button id="use-location" class="primary">Usa la mia posizione</button>
+        <button id="search-place" class="ghost">Cerca un luogo</button>
+        <button id="resume-place" class="ghost" hidden></button>
+      </div>
+      <p id="intro-msg" class="intro-msg" role="status"></p>
+    </div>
+  </section>
+
+  <!-- Barra in alto -->
+  <header id="topbar" class="topbar" hidden>
+    <span class="wordmark">Finestrino</span>
+    <button id="place" class="place" title="Cambia luogo"></button>
+    <span id="weather" class="weather"></span>
+  </header>
+
+  <p id="status" class="status" role="status" hidden></p>
+  <p id="toast" class="toast" role="alert" hidden></p>
+
+  <!-- Scheda dell'oggetto selezionato -->
+  <section id="card" class="card" hidden aria-live="polite">
+    <button id="card-close" class="card-close" aria-label="Chiudi scheda">&times;</button>
+    <h2 id="card-title" class="card-title"></h2>
+    <p id="card-sub" class="card-sub"></p>
+    <dl id="card-data" class="card-data"></dl>
+    <button id="board" class="primary wide">Sali a bordo</button>
+  </section>
+
+  <!-- Comandi in basso -->
+  <nav id="controls" class="controls" hidden>
+    <div id="sky-controls" class="group" role="group" aria-label="Vista">
+      <button class="seg is-on" data-mode="sky">Dal basso</button>
+      <button class="seg" data-mode="map">Dall'alto</button>
+    </div>
+    <div id="ride-controls" class="group" role="group" aria-label="Finestrino" hidden>
+      <button class="seg is-on" data-view="left">Sinistra</button>
+      <button class="seg" data-view="front">Avanti</button>
+      <button class="seg" data-view="right">Destra</button>
+      <button id="leave" class="primary">Scendi</button>
+    </div>
+  </nav>
+
+  <button id="credits-btn" class="credits-btn" hidden>Fonti dei dati</button>
+
+  <!-- Ricerca luogo -->
+  <dialog id="place-dialog" class="sheet">
+    <form id="place-form" class="sheet-form">
+      <h2>Da dove guardi il cielo?</h2>
+      <input id="place-input" type="search" placeholder="Città o paese" autocomplete="off" required>
+      <ul id="place-results" class="results"></ul>
+      <div class="sheet-actions">
+        <button type="button" class="ghost" id="place-cancel">Annulla</button>
+        <button type="submit" class="primary">Cerca</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Crediti -->
+  <dialog id="credits-dialog" class="sheet">
+    <div class="sheet-form">
+      <h2>Fonti dei dati</h2>
+      <p>Finestrino è gratuito e non usa servizi a pagamento. Questi sono i dati aperti che lo rendono possibile.</p>
+      <ul class="credits">
+        <li><strong>Aerei</strong>: <a href="https://adsb.lol" target="_blank" rel="noopener">ADSB.lol</a> (dati con licenza ODbL) e, come riserva, <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>. Raccolti da volontari con ricevitori ADS-B.</li>
+        <li><strong>Satelliti</strong>: orbite da <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, calcolate con <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a>.</li>
+        <li><strong>Immagini della Terra</strong>: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020). Uso non commerciale.</li>
+        <li><strong>Rilievo</strong>: Terrain Tiles di Mapzen su AWS Open Data.</li>
+        <li><strong>Meteo e ricerca luoghi</strong>: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0).</li>
+        <li><strong>Motore 3D</strong>: <a href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noopener">CesiumJS</a> (Apache 2.0).</li>
+      </ul>
+      <p class="note">Non usare Finestrino per navigare: le posizioni possono essere in ritardo o mancare.</p>
+      <div class="sheet-actions">
+        <button type="button" class="primary" id="credits-close">Chiudi</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
