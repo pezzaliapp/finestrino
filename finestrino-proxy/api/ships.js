@@ -14,6 +14,16 @@ const ALLOWED = [
 
 const WINDOW_MS = 15000; // per quanto ascoltare il flusso a ogni richiesta
 
+// L'AIS trasmette l'arrivo previsto come mese/giorno/ora/minuto UTC, senza anno
+function etaToIso(e) {
+  if (!e || !e.Month || !e.Day || e.Month > 12 || e.Day > 31 || e.Hour > 23 || e.Minute > 59) return null;
+  const now = new Date();
+  let d = new Date(Date.UTC(now.getUTCFullYear(), e.Month - 1, e.Day, e.Hour, e.Minute));
+  if (d.getTime() < now.getTime() - 30 * 86400000) d = new Date(Date.UTC(now.getUTCFullYear() + 1, e.Month - 1, e.Day, e.Hour, e.Minute));
+  if (d.getTime() < now.getTime() - 2 * 86400000) return null; // data vecchia, non aggiornata dall'equipaggio
+  return d.toISOString();
+}
+
 function ingest(ships, m) {
   const md = m.MetaData || {};
   const mmsi = md.MMSI;
@@ -38,6 +48,8 @@ function ingest(ships, m) {
     if (dest) s.destination = dest;
     const d = body.Dimension;
     if (d && (d.A || d.B)) s.length = (d.A || 0) + (d.B || 0);
+    const eta = etaToIso(body.Eta);
+    if (eta) s.eta = eta;
   } else if (type === 'StaticDataReport') {
     const b = body.ReportB;
     if (b && b.ShipType) s.type = b.ShipType;

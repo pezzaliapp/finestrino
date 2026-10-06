@@ -4,6 +4,7 @@
 import { createTerrainProvider, sampleHeight } from './terrain.js';
 import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
 import { findFlight, knownRoute, placeName } from './flights.js';
+import { visiblePasses, downloadPassIcs } from './sky.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
 import { fetchWeather, describeWeather, searchPlaces } from './weather.js';
 import { bearing, destination, distanceM, clamp, fmt0, fmt1, compass } from './geo.js';
@@ -348,6 +349,32 @@ function routeText(d) {
   return `${placeName(rt.origin)} → ${placeName(rt.destination)}`;
 }
 
+const hm = (date) => date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+/** Stime di decollo, atterraggio e percorso, da aeroporti, posizione e velocità. */
+function flightTimes(d) {
+  const rt = d.callsign ? knownRoute(d.callsign) : null;
+  const o = rt && rt.origin;
+  const t = rt && rt.destination;
+  if (!o || !t || o.lat == null || t.lat == null) return null;
+  const now = Date.now();
+  const pos = aircraftPosition(d, now);
+  const flown = distanceM(o.lat, o.lon, pos.lat, pos.lon) / 1000;
+  const left = distanceM(pos.lat, pos.lon, t.lat, t.lon) / 1000;
+  const total = distanceM(o.lat, o.lon, t.lat, t.lon) / 1000;
+  // Se l'aereo è molto fuori dalla linea tra i due aeroporti, la rotta probabilmente non è quella giusta
+  if (flown + left > total * 1.35 + 150) return null;
+  const speed = Math.max((d.gsKt || 430) * 1.852, 350); // km/h
+  const etaMin = (left / speed) * 60 + (left > 150 ? 12 : 5);  // margine per discesa e avvicinamento
+  const depMin = (flown / (speed * 0.85)) * 60 + 6;            // la salita è più lenta della crociera
+  return {
+    left,
+    progress: Math.min(1, flown / Math.max(1, flown + left)),
+    eta: new Date(now + etaMin * 60000),
+    dep: new Date(now - depMin * 60000),
+  };
+}
+
 function pollCenter() {
   if (state.mode === 'ride' && state.ride?.kind === 'plane') {
     const pose = ridePose();
@@ -620,7 +647,7 @@ function renderCard() {
   if (!id) return;
   const [kind, key] = id.split(':');
   const h = state.home;
-  let title = '', sub = '', rows = '', route = '';
+  let title = '', sub = '', rows = '', route = '', routeMuted = false;
 
   if (kind === 'plane') {
     const p = state.planes.get(key);
@@ -635,6 +662,18 @@ function renderCard() {
     if (d.gsKt !== null) rows += row('Velocità', `${fmt0(d.gsKt * 1.852)} km/h`);
     if (d.track !== null) rows += row('Direzione', `verso ${compass(d.track)}`);
     rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
+    const ft = flightTimes(d);
+    if (ft) {
+      rows += row('Decollo (stima)', `verso le ${hm(ft.dep)}`);
+      rows += row('Atterraggio (stima)', `verso le ${hm(ft.eta)}`);
+      rows += row('Percorso', `${Math.round(ft.progress * 100)}%, mancano ${fmt0(ft.left)} km`);
+    }
+    if (!route) {
+      route = !d.callsign ? 'Rotta non trasmessa da questo aereo'
+        : rt === undefined ? 'Cerco da dove viene e dove va…'
+          : 'Rotta non disponibile per questo volo';
+      routeMuted = true;
+    }
     if (d.callsign && title !== d.callsign) rows += row('Codice radio', escapeHtml(d.callsign));
     if (d.reg) rows += row('Registrazione', escapeHtml(d.reg));
   } else if (kind === 'ship') {
@@ -649,6 +688,10 @@ function renderCard() {
       : row('Velocità', 'ferma');
     if (d.sog > 0.3 && d.cog != null) rows += row('Direzione', `verso ${compass(d.cog)}`);
     if (d.destination) rows += row('Destinazione', escapeHtml(d.destination));
+    if (d.eta) {
+      const eta = new Date(d.eta);
+      rows += row('Arrivo previsto', escapeHtml(eta.toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })));
+    }
     if (d.length) rows += row('Lunghezza', `${fmt0(d.length)} m`);
     rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
   } else {
@@ -664,6 +707,7 @@ function renderCard() {
   $('board').hidden = kind === 'ship'; // sulle navi non si sale (per ora)
   $('card-share').hidden = kind === 'ship';
   $('card-route').textContent = route;
+  $('card-route').classList.toggle('is-muted', routeMuted);
   $('card-title').textContent = title;
   $('card-sub').textContent = sub;
   $('card-data').innerHTML = rows;
@@ -788,7 +832,9 @@ function updateStatus() {
       const d = state.planes.get(r.id)?.data;
       const speed = d?.gsKt ? `, ${fmt0(d.gsKt * 1.852)} km/h` : '';
       const route = routeText(d);
-      el.textContent = `A bordo di ${flightName(d)}${route ? `, ${route}` : ''}\n${fmt0(pose.alt)} m${speed}, verso ${compass(pose.heading)}`;
+      const ft = flightTimes(d);
+      const eta = ft ? `, atterraggio verso le ${hm(ft.eta)}` : '';
+      el.textContent = `A bordo di ${flightName(d)}${route ? `, ${route}` : ''}\n${fmt0(pose.alt)} m${speed}, verso ${compass(pose.heading)}${eta}`;
     } else if (pose) {
       el.textContent = `A bordo di ${state.sats.get(r.id).name}, ${fmt0(pose.alt / 1000)} km di quota`;
     }
@@ -1134,3 +1180,120 @@ if (linkPlane || linkSat) {
   $('use-location').classList.replace('primary', 'ghost');
   $('join-link').addEventListener('click', joinFromLink);
 }
+
+// ---------------------------------------------------------------- sopra di me
+/** Direzione (azimut), altezza sull'orizzonte e distanza di un punto visto da casa. */
+function lookFromHome(lat, lon, alt) {
+  const h = state.home;
+  const o = C.Cartesian3.fromDegrees(h.lon, h.lat, h.ground + 2);
+  const t = C.Cartesian3.fromDegrees(lon, lat, alt);
+  const inv = C.Matrix4.inverseTransformation(C.Transforms.eastNorthUpToFixedFrame(o), new C.Matrix4());
+  const v = C.Matrix4.multiplyByPoint(inv, t, new C.Cartesian3());
+  const range = C.Cartesian3.magnitude(v);
+  return {
+    az: ((Math.atan2(v.x, v.y) * 180) / Math.PI + 360) % 360,
+    el: (Math.asin(v.z / range) * 180) / Math.PI,
+    range,
+  };
+}
+
+function lookAt(az, el) {
+  if (state.mode !== 'sky') setMode('sky');
+  state.look.heading = az;
+  state.look.pitch = clamp(el, -10, 85);
+}
+
+function heightWords(el) {
+  if (el > 70) return 'quasi sopra la testa';
+  if (el > 40) return 'alto nel cielo';
+  if (el > 15) return 'a metà cielo';
+  return 'basso sull\'orizzonte';
+}
+
+function renderOverhead() {
+  const list = $('overhead-planes');
+  const now = Date.now();
+  const items = [...state.planes.values()]
+    .map((p) => {
+      const pos = aircraftPosition(p.data, now);
+      return { d: p.data, look: lookFromHome(pos.lat, pos.lon, pos.alt) };
+    })
+    .filter((x) => x.look.el > 3)
+    .sort((a, b) => a.look.range - b.look.range)
+    .slice(0, 6);
+
+  if (!items.length) {
+    list.innerHTML = '<li><p>In questo momento nessun aereo è sopra il tuo orizzonte. Riprova tra qualche minuto.</p></li>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const { d, look } of items) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    const route = routeText(d);
+    const where = `${fmt1(look.range / 1000)} km, ${heightWords(look.el)} verso ${compass(look.az)}`;
+    b.innerHTML = `${escapeHtml(flightName(d))}${route ? ` <span class="muted">${escapeHtml(route)}</span>` : ''}<small>${escapeHtml(where)}</small>`;
+    b.addEventListener('click', () => {
+      $('overhead-dialog').close();
+      lookAt(look.az, look.el);
+      openCard(`plane:${d.hex}`);
+    });
+    li.append(b);
+    list.append(li);
+  }
+}
+
+function renderPasses() {
+  const list = $('overhead-iss');
+  const iss = state.sats.get('25544');
+  if (!iss) {
+    list.innerHTML = '<li><p>Sto ancora caricando le orbite dei satelliti. Riapri tra qualche secondo.</p></li>';
+    return;
+  }
+  const passes = visiblePasses(iss.satrec, state.home, 72, 4);
+  if (!passes.length) {
+    list.innerHTML = '<li><p>Nessun passaggio visibile nelle prossime 72 ore: in questi giorni la Stazione passa di giorno o in pieno buio, quando non è illuminata dal Sole.</p></li>';
+    return;
+  }
+  list.innerHTML = '';
+  const dayFmt = { weekday: 'long', day: 'numeric', month: 'long' };
+  for (const p of passes) {
+    const mins = Math.max(1, Math.round((p.end - p.start) / 60000));
+    const day = p.start.toLocaleDateString('it-IT', dayFmt);
+    const desc = `Appare a ${compass(p.startAz)} alle ${hm(p.start)}, sale fino a ${Math.round(p.maxEl)}° verso ${compass(p.maxAz)} e sparisce a ${compass(p.endAz)} alle ${hm(p.end)}. Visibile a occhio nudo come un punto luminoso che si muove veloce, senza lampeggiare.`;
+    const li = document.createElement('li');
+    li.className = 'pass';
+    li.innerHTML = `<p class="pass-when">${escapeHtml(day)}, alle ${hm(p.start)} <span class="muted">per ${mins} min</span></p>
+      <p class="pass-desc">Da ${compass(p.startAz)} a ${compass(p.endAz)}, alta fino a ${Math.round(p.maxEl)}° sull'orizzonte.</p>`;
+    const actions = document.createElement('div');
+    actions.className = 'pass-actions';
+    const cal = document.createElement('button');
+    cal.type = 'button';
+    cal.className = 'ghost small';
+    cal.textContent = 'Aggiungi al calendario';
+    cal.addEventListener('click', () => downloadPassIcs(p, 'Stazione Spaziale Internazionale', desc));
+    const see = document.createElement('button');
+    see.type = 'button';
+    see.className = 'ghost small';
+    see.textContent = 'Dove guardare';
+    see.addEventListener('click', () => {
+      $('overhead-dialog').close();
+      lookAt(p.startAz, 15);
+      toast(`Guarda a ${compass(p.startAz)}, basso sull'orizzonte: alle ${hm(p.start)} la Stazione apparirà lì.`);
+    });
+    actions.append(see, cal);
+    li.append(actions);
+    list.append(li);
+  }
+}
+
+function openOverhead() {
+  if (!state.home) return;
+  renderOverhead();
+  renderPasses();
+  $('overhead-dialog').showModal();
+}
+
+$('overhead-btn').addEventListener('click', openOverhead);
+$('overhead-close').addEventListener('click', () => $('overhead-dialog').close());

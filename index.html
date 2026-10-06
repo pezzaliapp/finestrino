@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
   <div id="globe" aria-label="Vista 3D del cielo e della Terra"></div>
@@ -83,6 +83,7 @@
     <div id="sky-controls" class="group" role="group" aria-label="Vista">
       <button class="seg is-on" data-mode="sky">Dal basso</button>
       <button class="seg" data-mode="map">Dall'alto</button>
+      <button class="seg overhead" id="overhead-btn">Sopra di me</button>
     </div>
     <div id="ride-controls" class="group" role="group" aria-label="Finestrino" hidden>
       <button class="seg is-on" data-view="left">Sinistra</button>
@@ -106,6 +107,21 @@
         <button type="submit" class="primary">Cerca</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Sopra di me -->
+  <dialog id="overhead-dialog" class="sheet">
+    <div class="sheet-form">
+      <h2>Sopra di te adesso</h2>
+      <p>Gli aerei più vicini sopra il tuo orizzonte. Tocca un volo per vedere dove guardare.</p>
+      <ul id="overhead-planes" class="results"></ul>
+      <h2 class="sheet-h2">Stazione Spaziale: prossimi passaggi visibili</h2>
+      <p>Momenti in cui la vedrai a occhio nudo dal luogo scelto, se il cielo è sereno.</p>
+      <ul id="overhead-iss" class="results passes"></ul>
+      <div class="sheet-actions">
+        <button type="button" class="primary" id="overhead-close">Chiudi</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- Cerca un volo -->
@@ -149,6 +165,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=9"></script>
+  <script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

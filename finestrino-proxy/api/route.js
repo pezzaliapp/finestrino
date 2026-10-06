@@ -12,6 +12,8 @@ function airport(a) {
     name: a.name || null,
     city: a.municipality || null,
     country: a.country_name || null,
+    lat: typeof a.latitude === 'number' ? a.latitude : null,
+    lon: typeof a.longitude === 'number' ? a.longitude : null,
   };
 }
 

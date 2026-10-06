@@ -10,9 +10,10 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Dall'alto**: esplori la zona come su una mappa 3D e scegli un aereo.
 - **A bordo**: finestrino sinistro, destro o vista avanti. Puoi guardarti intorno trascinando.
 - **Cerca un volo**: scrivi il numero del volo (FR1234), il codice radio (RYR4KX) o la registrazione (EI-DYC) e sali direttamente a bordo.
-- **Da dove viene e dove va**: nella scheda e a bordo compaiono compagnia, partenza e arrivo (es. Bergamo → Bari).
+- **Da dove viene e dove va**: nella scheda e a bordo compaiono compagnia, partenza e arrivo (es. Bergamo → Bari), con decollo e atterraggio stimati e la percentuale di percorso.
+- **Sopra di me**: gli aerei più vicini sopra il tuo orizzonte, con la direzione in cui guardare, e i prossimi passaggi visibili della Stazione Spaziale, da aggiungere al calendario.
 - **Condividi il finestrino**: un link che porta chi lo apre sullo stesso aereo o satellite, in diretta. Con anteprima per WhatsApp, Telegram e social.
-- **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità e destinazione. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
+- **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità, destinazione e orario di arrivo dichiarato dall'equipaggio. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
 - **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
 - **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
 - **Notte vera**: giorno e notte seguono l'ora reale. Di notte la Terra è buia e si accendono le luci delle città (NASA Black Marble).
@@ -124,6 +125,7 @@ sw.js                 service worker: file sempre aggiornati, copia offline
 version.json          numero di versione (lo aggiorna pubblica.sh)
 pubblica.sh           pubblica una modifica con un comando
 js/flights.js         ricerca dei voli e rotte
+js/sky.js             passaggi visibili della Stazione Spaziale e file calendario
 og-image.png          anteprima per i social
 manifest.webmanifest  installazione come app
 ```
