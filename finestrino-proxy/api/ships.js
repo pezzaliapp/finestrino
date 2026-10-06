@@ -14,6 +14,32 @@ const ALLOWED = [
 
 const WINDOW_MS = 15000; // per quanto ascoltare il flusso a ogni richiesta
 
+// Nome, tipo, destinazione e arrivo arrivano solo ogni 6 minuti (e mai dalle imbarcazioni di classe B).
+// Li ricordiamo in memoria per 24 ore, condivisi tra tutte le richieste che arrivano a questa istanza.
+const STATIC = new Map(); // mmsi -> { name, type, destination, eta, length, cls, t }
+const STATIC_TTL = 24 * 3600 * 1000;
+const STATIC_FIELDS = ['name', 'type', 'destination', 'eta', 'length', 'cls'];
+
+function remember(s) {
+  const old = STATIC.get(s.mmsi) || {};
+  let changed = false;
+  for (const f of STATIC_FIELDS) if (s[f] != null && s[f] !== '' && old[f] !== s[f]) { old[f] = s[f]; changed = true; }
+  if (changed || !old.t) { old.t = Date.now(); STATIC.set(s.mmsi, old); }
+}
+
+function enrich(s) {
+  const old = STATIC.get(s.mmsi);
+  if (!old || Date.now() - old.t > STATIC_TTL) return s;
+  for (const f of STATIC_FIELDS) if ((s[f] == null || s[f] === '') && old[f] != null) s[f] = old[f];
+  return s;
+}
+
+function pruneStatic() {
+  if (STATIC.size < 20000) return;
+  const limit = Date.now() - STATIC_TTL;
+  for (const [k, v] of STATIC) if (v.t < limit) STATIC.delete(k);
+}
+
 // L'AIS trasmette l'arrivo previsto come mese/giorno/ora/minuto UTC, senza anno
 function etaToIso(e) {
   if (!e || !e.Month || !e.Day || e.Month > 12 || e.Day > 31 || e.Hour > 23 || e.Minute > 59) return null;
@@ -34,6 +60,8 @@ function ingest(ships, m) {
   const type = m.MessageType || '';
   const body = (m.Message && m.Message[type]) || {};
 
+  if (type.includes('ClassB')) s.cls = 'B';
+  if (type === 'StaticDataReport') s.cls = 'B';
   if (type.includes('PositionReport')) {
     const lat = body.Latitude ?? md.latitude;
     const lon = body.Longitude ?? md.longitude;
@@ -129,7 +157,9 @@ export default async function handler(req, res) {
   const box = [[la - dLat, lo - dLon], [la + dLat, lo + dLon]];
 
   const { ships, error } = await listen(key, box);
-  const list = [...ships.values()].filter((s) => s.lat != null && s.lon != null);
+  for (const s of ships.values()) remember(s);
+  pruneStatic();
+  const list = [...ships.values()].filter((s) => s.lat != null && s.lon != null).map(enrich);
 
   if (!list.length && error) {
     return res.status(502).send(JSON.stringify({ error, ships: [] }));

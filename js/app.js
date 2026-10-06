@@ -359,6 +359,8 @@ function routeText(d) {
 
 const hm = (date) => date.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 /** Quota in metri; in inglese anche in piedi, come si usa in aviazione. */
+/** Valore della riga "Direzione": "verso nord-est" in italiano, "North-east" in inglese. */
+const dirText = (deg) => (LANG === 'en' ? compass(deg).replace(/^./, (c) => c.toUpperCase()) : t('verso {dir}', { dir: compass(deg) }));
 const altText = (m) => (LANG === 'en' ? `${fmt0(m)} m (${fmt0(m / 0.3048)} ft)` : `${fmt0(m)} m`);
 
 /** Stime di decollo, atterraggio e percorso, da aeroporti, posizione e velocità. */
@@ -525,7 +527,7 @@ function restoreShips() {
 
 // Nome, tipo, destinazione e arrivo arrivano solo ogni 6 minuti: li ricordiamo per 3 giorni
 const SHIPINFO_KEY = 'finestrino.shipinfo.v1';
-const INFO_FIELDS = ['name', 'type', 'destination', 'eta', 'length'];
+const INFO_FIELDS = ['name', 'type', 'destination', 'eta', 'length', 'cls'];
 const shipInfo = (() => {
   try {
     const all = JSON.parse(localStorage.getItem(SHIPINFO_KEY) || '{}');
@@ -754,7 +756,7 @@ function renderCard() {
     sub = [rt && rt.airline, d.desc || d.type].filter(Boolean).join(', ') || t('Aereo in volo');
     rows += row(t('Quota'), altText(pos.alt));
     if (d.gsKt !== null) rows += row(t('Velocità'), `${fmt0(d.gsKt * 1.852)} km/h`);
-    if (d.track !== null) rows += row(t('Direzione'), t('verso {dir}', { dir: compass(d.track) }));
+    if (d.track !== null) rows += row(t('Direzione'), dirText(d.track));
     rows += row(t('Distanza da te'), `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
     const ft = flightTimes(d);
     if (ft) {
@@ -780,7 +782,7 @@ function renderCard() {
     rows += d.sog > 0.3
       ? row(t('Velocità'), t('{kn} nodi ({kmh} km/h)', { kn: fmt1(d.sog), kmh: fmt0(d.sog * 1.852) }))
       : row(t('Velocità'), t('ferma'));
-    if (d.sog > 0.3 && d.cog != null) rows += row(t('Direzione'), t('verso {dir}', { dir: compass(d.cog) }));
+    if (d.sog > 0.3 && d.cog != null) rows += row(t('Direzione'), dirText(d.cog));
 
     // Rotta: partenza (se l'equipaggio la scrive) e destinazione
     const dest = d.destination ? splitDestination(d.destination) : null;
@@ -801,7 +803,9 @@ function renderCard() {
       }
       if (toPort) rows += row(t('Destinazione scritta'), escapeHtml(d.destination));
     } else {
-      route = t('Destinazione non ancora ricevuta: le navi la trasmettono ogni 6 minuti');
+      route = d.cls === 'B'
+        ? t('Le piccole imbarcazioni (AIS classe B) non trasmettono destinazione né orari')
+        : t('Destinazione non ancora ricevuta: le navi la trasmettono ogni 6 minuti. Lascia l\'app aperta qualche minuto');
       routeMuted = true;
     }
     if (d.eta) {
