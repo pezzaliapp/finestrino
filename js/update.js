@@ -3,6 +3,8 @@
 // 2) Ogni pochi minuti l'app legge version.json: se è cambiato, si ricarica da sola
 //    (aspettando che tu scenda dall'aereo, per non interrompere un volo).
 
+import { t } from './i18n.js';
+
 const CHECK_EVERY = 5 * 60 * 1000;
 let current = null;
 
@@ -39,7 +41,7 @@ export async function startAutoUpdate(canReload, notify) {
 
   const tryReload = () => {
     if (!canReload()) return; // riprova al prossimo controllo
-    notify('È uscita una nuova versione di Finestrino. Aggiorno…');
+    notify(t('È uscita una nuova versione di Finestrino. Aggiorno…'));
     setTimeout(() => location.reload(), 1500);
   };
 

@@ -1,4 +1,5 @@
 // Meteo e ricerca luoghi: Open-Meteo, gratuito senza chiave per uso non commerciale.
+import { t, LANG } from './i18n.js';
 
 export async function fetchWeather(lat, lon) {
   const url = 'https://api.open-meteo.com/v1/forecast'
@@ -23,12 +24,12 @@ const WMO = {
 };
 
 export function describeWeather(code) {
-  return WMO[code] ?? '';
+  return WMO[code] ? t(WMO[code]) : '';
 }
 
 export async function searchPlaces(query) {
   const url = 'https://geocoding-api.open-meteo.com/v1/search'
-    + `?name=${encodeURIComponent(query)}&count=6&language=it&format=json`;
+    + `?name=${encodeURIComponent(query)}&count=6&language=${LANG}&format=json`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Ricerca HTTP ${res.status}`);
   const json = await res.json();

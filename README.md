@@ -16,6 +16,7 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità e rotta: porto di destinazione (decodificato da codici come "HR SPU"), miglia mancanti, arrivo dichiarato dall'equipaggio e arrivo stimato. Nome e destinazione vengono ricordati per 3 giorni, perché le navi li trasmettono solo ogni 6 minuti.
 - **Linea della rotta**: toccando un aereo o una nave compare una linea tratteggiata verso l'aeroporto o il porto di arrivo. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
 - **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
+- **Italiano e inglese**: la lingua si sceglie da sola in base al telefono o al browser. Si cambia dal pulsante **i** (Italiano / English) oppure con `?lang=en` / `?lang=it` nell'indirizzo. I link condivisi si aprono nella lingua di chi li manda. In inglese le quote mostrano anche i piedi.
 - **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
 - **Notte vera**: giorno e notte seguono l'ora reale. Di notte la Terra è buia e si accendono le luci delle città (NASA Black Marble).
 - **Meteo vero**: temperatura e cielo del tuo luogo, con nuvole disegnate in base alla copertura reale.
@@ -127,6 +128,8 @@ version.json          numero di versione (lo aggiorna pubblica.sh)
 pubblica.sh           pubblica una modifica con un comando
 js/flights.js         ricerca dei voli e rotte
 js/ports.js           porti di destinazione delle navi
+js/i18n.js            scelta della lingua e traduzione
+js/lang-en.js         testi in inglese (le chiavi sono le frasi italiane)
 js/sky.js             passaggi visibili della Stazione Spaziale e file calendario
 og-image.png          anteprima per i social
 manifest.webmanifest  installazione come app
@@ -135,3 +138,7 @@ manifest.webmanifest  installazione come app
 ## Licenza
 
 Il codice è sotto licenza MIT. I dati mostrati appartengono alle rispettive fonti e seguono le loro condizioni (vedi tabella sopra e il pulsante **Fonti dei dati** nell'app).
+
+## Aggiungere o modificare una traduzione
+
+Nel codice ogni testo è scritto in italiano dentro `t('...')`. In `js/lang-en.js` c'è la stessa frase italiana come chiave e la traduzione inglese come valore. Se una frase non ha traduzione, l'app mostra l'italiano: non si rompe nulla.

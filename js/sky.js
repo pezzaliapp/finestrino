@@ -1,6 +1,7 @@
 // Calcoli del cielo, tutti nel browser: passaggi visibili della Stazione Spaziale
 // e file calendario (.ics) per non perderli.
 import * as satellite from 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/+esm';
+import { t } from './i18n.js';
 
 const RE = 6378.137; // raggio terrestre (km)
 const rad = (d) => (d * Math.PI) / 180;
@@ -78,15 +79,15 @@ export function downloadPassIcs(pass, satName, description) {
     `DTSTAMP:${icsDate(new Date())}`,
     `DTSTART:${icsDate(pass.start)}`,
     `DTEND:${icsDate(pass.end)}`,
-    `SUMMARY:Passaggio visibile: ${satName}`,
+    `SUMMARY:${t('Passaggio visibile: {name}', { name: satName })}`,
     `DESCRIPTION:${description.replace(/[,;]/g, (m) => `\\${m}`)}`,
-    'BEGIN:VALARM', 'TRIGGER:-PT10M', 'ACTION:DISPLAY', `DESCRIPTION:Tra 10 minuti passa ${satName}`, 'END:VALARM',
+    'BEGIN:VALARM', 'TRIGGER:-PT10M', 'ACTION:DISPLAY', `DESCRIPTION:${t('Tra 10 minuti passa {name}', { name: satName })}`, 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR',
   ];
   const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'passaggio-stazione-spaziale.ics';
+  a.download = t('passaggio-stazione-spaziale.ics');
   document.body.append(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);

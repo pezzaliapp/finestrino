@@ -87,7 +87,7 @@ export function createTerrainProvider() {
     width: GRID,
     height: GRID,
     tilingScheme,
-    credit: 'Rilievo: Terrain Tiles (Mapzen, AWS Open Data)',
+    credit: 'Terrain Tiles (Mapzen, AWS Open Data)',
     callback: async (x, y, level) => {
       const rect = tilingScheme.tileXYToRectangle(x, y, level);
       const west = C.Math.toDegrees(rect.west);

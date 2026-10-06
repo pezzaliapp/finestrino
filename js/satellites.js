@@ -3,6 +3,7 @@
 // li teniamo in cache nel browser per 2 ore e non riproviamo in caso di errore.
 
 import * as satellite from 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/+esm';
+import { t } from './i18n.js';
 
 const GROUPS = ['stations', 'visual']; // stazioni spaziali + i ~150 satelliti più luminosi
 const KEY = 'finestrino.tle.v1';
@@ -66,8 +67,8 @@ function parseTle(text) {
 }
 
 function prettyName(n) {
-  if (/^ISS \(ZARYA\)/.test(n)) return 'Stazione Spaziale Internazionale';
-  if (/^CSS \(TIANHE\)/.test(n)) return 'Stazione spaziale cinese Tiangong';
+  if (/^ISS \(ZARYA\)/.test(n)) return t('Stazione Spaziale Internazionale');
+  if (/^CSS \(TIANHE\)/.test(n)) return t('Stazione spaziale cinese Tiangong');
   return n;
 }
 

@@ -7,6 +7,8 @@
   <meta name="description" content="Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.">
   <meta name="theme-color" content="#0E1B2C">
   <meta property="og:type" content="website">
+  <meta property="og:locale" content="it_IT">
+  <meta property="og:locale:alternate" content="en_GB">
   <meta property="og:site_name" content="Finestrino">
   <meta property="og:title" content="Finestrino: siediti al finestrino di un aereo vero">
   <meta property="og:description" content="Gli aerei, le navi e i satelliti che ti passano sopra adesso. Scegline uno e guarda il mondo dal suo finestrino, in diretta.">
@@ -26,10 +28,10 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Widgets/widgets.css">
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.121.0/Build/Cesium/Cesium.js"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
-  <div id="globe" aria-label="Vista 3D del cielo e della Terra"></div>
+  <div id="globe" aria-label="Vista 3D del cielo e della Terra" data-i18n-attr="aria-label"></div>
 
   <!-- Il finestrino: appare quando sei a bordo -->
   <div id="window" class="window" hidden aria-hidden="true">
@@ -40,11 +42,11 @@
   <section id="intro" class="intro">
     <div class="intro-inner">
       <h1 class="intro-title">Finestrino</h1>
-      <p class="intro-lede" id="intro-lede">Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.</p>
+      <p class="intro-lede" id="intro-lede" data-i18n>Il cielo sopra di te, adesso. Scegli un aereo o un satellite che ti passa sopra e siediti al suo finestrino.</p>
       <div class="intro-actions">
-        <button id="join-link" class="primary" hidden>Sali a bordo</button>
-        <button id="use-location" class="primary">Usa la mia posizione</button>
-        <button id="search-place" class="ghost">Cerca un luogo</button>
+        <button id="join-link" class="primary" hidden data-i18n>Sali a bordo</button>
+        <button id="use-location" class="primary" data-i18n>Usa la mia posizione</button>
+        <button id="search-place" class="ghost" data-i18n>Cerca un luogo</button>
         <button id="resume-place" class="ghost" hidden></button>
       </div>
       <p id="intro-msg" class="intro-msg" role="status"></p>
@@ -54,12 +56,12 @@
   <!-- Barra in alto -->
   <header id="topbar" class="topbar" hidden>
     <span class="wordmark">Finestrino</span>
-    <button id="place" class="place" title="Cambia luogo"></button>
+    <button id="place" class="place" title="Cambia luogo" data-i18n-attr="title"></button>
     <span id="weather" class="weather"></span>
-    <button id="find-btn" class="info" aria-label="Cerca un volo" title="Cerca un volo">
+    <button id="find-btn" class="info" aria-label="Cerca un volo" title="Cerca un volo" data-i18n-attr="aria-label,title">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
     </button>
-    <button id="credits-btn" class="info" aria-label="Fonti dei dati" title="Fonti dei dati" hidden>i</button>
+    <button id="credits-btn" class="info" aria-label="Fonti dei dati" title="Fonti dei dati" data-i18n-attr="aria-label,title" hidden>i</button>
   </header>
 
   <p id="status" class="status" role="status" hidden></p>
@@ -67,31 +69,31 @@
 
   <!-- Scheda dell'oggetto selezionato -->
   <section id="card" class="card" hidden aria-live="polite">
-    <button id="card-close" class="card-close" aria-label="Chiudi scheda">&times;</button>
+    <button id="card-close" class="card-close" aria-label="Chiudi scheda" data-i18n-attr="aria-label">&times;</button>
     <h2 id="card-title" class="card-title"></h2>
     <p id="card-sub" class="card-sub"></p>
     <p id="card-route" class="card-route"></p>
     <dl id="card-data" class="card-data"></dl>
     <div class="card-actions">
-      <button id="board" class="primary">Sali a bordo</button>
-      <button id="card-share" class="ghost">Condividi</button>
+      <button id="board" class="primary" data-i18n>Sali a bordo</button>
+      <button id="card-share" class="ghost" data-i18n>Condividi</button>
     </div>
   </section>
 
   <!-- Comandi in basso -->
   <nav id="controls" class="controls" hidden>
-    <div id="sky-controls" class="group" role="group" aria-label="Vista">
-      <button class="seg is-on" data-mode="sky">Dal basso</button>
-      <button class="seg" data-mode="map">Dall'alto</button>
-      <button class="seg overhead" id="overhead-btn">Sopra di me</button>
+    <div id="sky-controls" class="group" role="group" aria-label="Vista" data-i18n-attr="aria-label">
+      <button class="seg is-on" data-mode="sky" data-i18n>Dal basso</button>
+      <button class="seg" data-mode="map" data-i18n>Dall'alto</button>
+      <button class="seg overhead" id="overhead-btn" data-i18n>Sopra di me</button>
     </div>
     <div id="ride-controls" class="group" role="group" aria-label="Finestrino" hidden>
-      <button class="seg is-on" data-view="left">Sinistra</button>
-      <button class="seg" data-view="front">Avanti</button>
-      <button class="seg" data-view="right">Destra</button>
-      <button id="sound" class="seg sound is-on" aria-pressed="true" title="Rumore di cabina">Suono</button>
-      <button id="share" class="seg share" title="Condividi questo finestrino">Condividi</button>
-      <button id="leave" class="primary">Scendi</button>
+      <button class="seg is-on" data-view="left" data-i18n>Sinistra</button>
+      <button class="seg" data-view="front" data-i18n>Avanti</button>
+      <button class="seg" data-view="right" data-i18n>Destra</button>
+      <button id="sound" class="seg sound is-on" aria-pressed="true" title="Rumore di cabina" data-i18n-attr="title">Suono</button>
+      <button id="share" class="seg share" title="Condividi questo finestrino" data-i18n-attr="title" data-i18n>Condividi</button>
+      <button id="leave" class="primary" data-i18n>Scendi</button>
     </div>
   </nav>
 
@@ -99,12 +101,12 @@
   <!-- Ricerca luogo -->
   <dialog id="place-dialog" class="sheet">
     <form id="place-form" class="sheet-form">
-      <h2>Da dove guardi il cielo?</h2>
-      <input id="place-input" type="search" placeholder="Città o paese" autocomplete="off" required>
+      <h2 data-i18n>Da dove guardi il cielo?</h2>
+      <input id="place-input" type="search" placeholder="Città o paese" autocomplete="off" required data-i18n-attr="placeholder">
       <ul id="place-results" class="results"></ul>
       <div class="sheet-actions">
-        <button type="button" class="ghost" id="place-cancel">Annulla</button>
-        <button type="submit" class="primary">Cerca</button>
+        <button type="button" class="ghost" id="place-cancel" data-i18n>Annulla</button>
+        <button type="submit" class="primary" data-i18n>Cerca</button>
       </div>
     </form>
   </dialog>
@@ -112,14 +114,14 @@
   <!-- Sopra di me -->
   <dialog id="overhead-dialog" class="sheet">
     <div class="sheet-form">
-      <h2>Sopra di te adesso</h2>
-      <p>Gli aerei più vicini sopra il tuo orizzonte. Tocca un volo per vedere dove guardare.</p>
+      <h2 data-i18n>Sopra di te adesso</h2>
+      <p data-i18n>Gli aerei più vicini sopra il tuo orizzonte. Tocca un volo per vedere dove guardare.</p>
       <ul id="overhead-planes" class="results"></ul>
-      <h2 class="sheet-h2">Stazione Spaziale: prossimi passaggi visibili</h2>
-      <p>Momenti in cui la vedrai a occhio nudo dal luogo scelto, se il cielo è sereno.</p>
+      <h2 class="sheet-h2" data-i18n>Stazione Spaziale: prossimi passaggi visibili</h2>
+      <p data-i18n>Momenti in cui la vedrai a occhio nudo dal luogo scelto, se il cielo è sereno.</p>
       <ul id="overhead-iss" class="results passes"></ul>
       <div class="sheet-actions">
-        <button type="button" class="primary" id="overhead-close">Chiudi</button>
+        <button type="button" class="primary" id="overhead-close" data-i18n>Chiudi</button>
       </div>
     </div>
   </dialog>
@@ -127,13 +129,13 @@
   <!-- Cerca un volo -->
   <dialog id="find-dialog" class="sheet">
     <form id="find-form" class="sheet-form">
-      <h2>Cerca un volo in aria</h2>
-      <input id="find-input" type="search" placeholder="FR1234, AZ1234, RYR4KX o EI-DYC" autocomplete="off" autocapitalize="characters" required>
-      <p class="hint">Scrivi il numero del volo come sul biglietto. Alcune compagnie, come Ryanair ed easyJet, via radio usano un codice diverso: se non lo trovo, prova quello che vedi sul tabellone o su un sito di voli (per esempio RYR4KX).</p>
+      <h2 data-i18n>Cerca un volo in aria</h2>
+      <input id="find-input" type="search" placeholder="FR1234, AZ1234, RYR4KX o EI-DYC" autocomplete="off" autocapitalize="characters" required data-i18n-attr="placeholder">
+      <p class="hint" data-i18n>Scrivi il numero del volo come sul biglietto. Alcune compagnie, come Ryanair ed easyJet, via radio usano un codice diverso: se non lo trovo, prova quello che vedi sul tabellone o su un sito di voli (per esempio RYR4KX).</p>
       <ul id="find-results" class="results"></ul>
       <div class="sheet-actions">
-        <button type="button" class="ghost" id="find-cancel">Chiudi</button>
-        <button type="submit" class="primary">Cerca</button>
+        <button type="button" class="ghost" id="find-cancel" data-i18n>Chiudi</button>
+        <button type="submit" class="primary" data-i18n>Cerca</button>
       </div>
     </form>
   </dialog>
@@ -141,30 +143,34 @@
   <!-- Crediti -->
   <dialog id="credits-dialog" class="sheet">
     <div class="sheet-form">
-      <h2>Fonti dei dati</h2>
-      <p>Finestrino è gratuito e non usa servizi a pagamento. Questi sono i dati aperti che lo rendono possibile.</p>
+      <div class="lang-switch" role="group" aria-label="Lingua / Language">
+        <button type="button" class="seg" data-lang="it">Italiano</button>
+        <button type="button" class="seg" data-lang="en">English</button>
+      </div>
+      <h2 data-i18n>Fonti dei dati</h2>
+      <p data-i18n>Finestrino è gratuito e non usa servizi a pagamento. Questi sono i dati aperti che lo rendono possibile.</p>
       <ul class="credits">
-        <li><strong>Aerei</strong>: <a href="https://adsb.lol" target="_blank" rel="noopener">ADSB.lol</a> (dati con licenza ODbL) e, come riserva, <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>. Raccolti da volontari con ricevitori ADS-B.</li>
-        <li><strong>Rotte dei voli</strong>: <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb</a>; dati delle rotte di David Taylor (Edinburgh) e Jim Mason (Glasgow).</li>
-        <li><strong>Navi e traghetti</strong>: <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>, segnali AIS raccolti da una rete di ricevitori. Gratuito per uso non commerciale.</li>
-        <li><strong>Satelliti</strong>: orbite da <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, calcolate con <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a>.</li>
-        <li><strong>Immagini della Terra</strong>: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020). Uso non commerciale.</li>
-        <li><strong>Luci delle città di notte</strong>: NASA Black Marble, tramite <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>. Immagine composita dai satelliti, non in diretta.</li>
-        <li><strong>Rilievo</strong>: Terrain Tiles di Mapzen su AWS Open Data.</li>
-        <li><strong>Meteo e ricerca luoghi</strong>: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0).</li>
-        <li><strong>Motore 3D</strong>: <a href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noopener">CesiumJS</a> (Apache 2.0).</li>
+        <li data-i18n-html><strong>Aerei</strong>: <a href="https://adsb.lol" target="_blank" rel="noopener">ADSB.lol</a> (dati con licenza ODbL) e, come riserva, <a href="https://adsb.fi" target="_blank" rel="noopener">adsb.fi</a>. Raccolti da volontari con ricevitori ADS-B.</li>
+        <li data-i18n-html><strong>Rotte dei voli</strong>: <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb</a>; dati delle rotte di David Taylor (Edinburgh) e Jim Mason (Glasgow).</li>
+        <li data-i18n-html><strong>Navi e traghetti</strong>: <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>, segnali AIS raccolti da una rete di ricevitori. Gratuito per uso non commerciale.</li>
+        <li data-i18n-html><strong>Satelliti</strong>: orbite da <a href="https://celestrak.org" target="_blank" rel="noopener">CelesTrak</a>, calcolate con <a href="https://github.com/shashwatak/satellite-js" target="_blank" rel="noopener">satellite.js</a>.</li>
+        <li data-i18n-html><strong>Immagini della Terra</strong>: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020). Uso non commerciale.</li>
+        <li data-i18n-html><strong>Luci delle città di notte</strong>: NASA Black Marble, tramite <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA GIBS</a>. Immagine composita dai satelliti, non in diretta.</li>
+        <li data-i18n-html><strong>Rilievo</strong>: Terrain Tiles di Mapzen su AWS Open Data.</li>
+        <li data-i18n-html><strong>Meteo e ricerca luoghi</strong>: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0).</li>
+        <li data-i18n-html><strong>Motore 3D</strong>: <a href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noopener">CesiumJS</a> (Apache 2.0).</li>
       </ul>
-      <p class="note">Non usare Finestrino per navigare: le posizioni possono essere in ritardo o mancare.</p>
-      <p class="note">Il rumore di cabina è generato dal vivo nel browser, senza file audio.</p>
+      <p class="note" data-i18n>Non usare Finestrino per navigare: le posizioni possono essere in ritardo o mancare.</p>
+      <p class="note" data-i18n>Il rumore di cabina è generato dal vivo nel browser, senza file audio.</p>
       <p class="note" id="app-version"></p>
-      <h3 class="credits-sub">Attribuzioni della mappa</h3>
+      <h3 class="credits-sub" data-i18n>Attribuzioni della mappa</h3>
       <div id="cesium-credits" class="cesium-credits"></div>
       <div class="sheet-actions">
-        <button type="button" class="primary" id="credits-close">Chiudi</button>
+        <button type="button" class="primary" id="credits-close" data-i18n>Chiudi</button>
       </div>
     </div>
   </dialog>
 
-  <script type="module" src="js/app.js?v=11"></script>
+  <script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>

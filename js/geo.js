@@ -1,4 +1,6 @@
 // Piccole funzioni di geografia, senza dipendenze.
+import { LANG, LOCALE } from './i18n.js';
+
 const R = 6371008.8; // raggio medio della Terra in metri
 
 export const toRad = (d) => (d * Math.PI) / 180;
@@ -42,13 +44,15 @@ export function lerpAngle(a, b, k) {
   return (a + d * k + 360) % 360;
 }
 
-const nf0 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
-const nf1 = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
+const nf0 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
 export const fmt0 = (n) => nf0.format(n);
 export const fmt1 = (n) => nf1.format(n);
 
 /** Punto cardinale in italiano per una rotta. */
 export function compass(deg) {
-  const names = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ovest', 'ovest', 'nord-ovest'];
+  const names = LANG === 'en'
+    ? ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+    : ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ovest', 'ovest', 'nord-ovest'];
   return names[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 }

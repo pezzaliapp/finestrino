@@ -33,6 +33,24 @@ const PORTS = {
 // Parole che non sono luoghi
 const NOT_PLACES = /^(OFFSHORE|FISHING|FISH|FOR ORDERS?|ORDERS?|ANCHORAGE|ANCHOR|AT SEA|SEA|NONE|N\/?A|TEST|TRAINING|PATROL|SAR|WORK|WORKING|CRUISING|SAILING|PILOT|TUG|DREDGING|STANDBY|STAND BY|LOCAL|HOME|PORT|[-. ]*)$/;
 
+import { LANG } from './i18n.js';
+
+const COUNTRY_EN = {
+  Italia: 'Italy', Croazia: 'Croatia', Slovenia: 'Slovenia', Montenegro: 'Montenegro', Albania: 'Albania',
+  Grecia: 'Greece', Malta: 'Malta', Spagna: 'Spain', Francia: 'France', Tunisia: 'Tunisia', Egitto: 'Egypt',
+};
+const NAME_EN = {
+  Venezia: 'Venice', Genova: 'Genoa', Napoli: 'Naples', Pireo: 'Piraeus', Patrasso: 'Patras', 'Corfù': 'Corfu',
+  Salonicco: 'Thessaloniki', Barcellona: 'Barcelona', Marsiglia: 'Marseille', Tunisi: 'Tunis', 'La Valletta': 'Valletta',
+};
+
+/** In inglese usa il nome locale: "Spalato (Split)" -> "Split", "Napoli" -> "Naples". */
+function localName(name) {
+  if (LANG !== 'en') return name;
+  const m = name.match(/\(([^)]+)\)/);
+  return m ? m[1] : NAME_EN[name] || name;
+}
+
 const cache = new Map();
 
 function clean(text) {
@@ -48,7 +66,7 @@ export function splitDestination(text) {
 }
 
 async function geocode(name) {
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=it&format=json`;
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=${LANG}&format=json`;
   const r = await fetch(url);
   if (!r.ok) return null;
   const j = await r.json();
@@ -67,7 +85,7 @@ export function resolvePort(text) {
     const code = t.replace(/[\s\-/]/g, '');
     if (/^[A-Z]{5}$/.test(code) && PORTS[code]) {
       const [name, country, lat, lon] = PORTS[code];
-      return { name, country, lat, lon };
+      return { name: localName(name), country: LANG === 'en' ? COUNTRY_EN[country] || country : country, lat, lon };
     }
     // Nome del porto, eventualmente con il paese: "SPLIT", "ANCONA ITALY"
     const words = t.replace(/[\-/]/g, ' ').split(' ').filter((w) => w.length > 2);

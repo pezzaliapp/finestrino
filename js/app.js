@@ -1,6 +1,8 @@
 // Finestrino: il cielo sopra di te, dal finestrino di ciò che ci passa adesso.
 // Tutto gratuito: nessuna chiave API, nessun abbonamento, nessun server.
 
+import './lang-en.js';
+import { t, LANG, LOCALE, translatePage, setLang } from './i18n.js';
 import { createTerrainProvider, sampleHeight } from './terrain.js';
 import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
 import { findFlight, knownRoute, placeName } from './flights.js';
@@ -14,6 +16,7 @@ import { fetchShips, shipPosition, shipTypeName, NAV_STATUS } from './ships.js';
 import { startAutoUpdate } from './update.js';
 
 const C = window.Cesium;
+translatePage();
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -108,7 +111,7 @@ function addNightLights(i = 0) {
   const provider = new C.UrlTemplateImageryProvider({
     url: NIGHT_SOURCES[i],
     maximumLevel: 8,
-    credit: new C.Credit('Luci notturne: NASA Black Marble (GIBS)', false),
+    credit: new C.Credit(t('Luci notturne: NASA Black Marble (GIBS)'), false),
   });
   let failures = 0;
   provider.errorEvent.addEventListener((err) => {
@@ -315,7 +318,7 @@ function mergePlanes(list) {
     h.missed += 1;
     const ridden = state.ride?.kind === 'plane' && state.ride.id === hex;
     if (ridden && h.missed >= 6) {
-      endRide('Il volo è uscito dalla zona coperta dai ricevitori, oppure è atterrato. Sei di nuovo a terra.');
+      endRide(t('Il volo è uscito dalla zona coperta dai ricevitori, oppure è atterrato. Sei di nuovo a terra.'));
     }
     if (!ridden && h.missed >= 3) {
       if (state.selected === `plane:${hex}`) closeCard();
@@ -350,7 +353,9 @@ function routeText(d) {
   return `${placeName(rt.origin)} → ${placeName(rt.destination)}`;
 }
 
-const hm = (date) => date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+const hm = (date) => date.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+/** Quota in metri; in inglese anche in piedi, come si usa in aviazione. */
+const altText = (m) => (LANG === 'en' ? `${fmt0(m)} m (${fmt0(m / 0.3048)} ft)` : `${fmt0(m)} m`);
 
 /** Stime di decollo, atterraggio e percorso, da aeroporti, posizione e velocità. */
 function flightTimes(d) {
@@ -742,25 +747,25 @@ function renderCard() {
     const rt = d.callsign ? knownRoute(d.callsign) : null;
     title = flightName(d);
     route = routeText(d);
-    sub = [rt && rt.airline, d.desc || d.type].filter(Boolean).join(', ') || 'Aereo in volo';
-    rows += row('Quota', `${fmt0(pos.alt)} m`);
-    if (d.gsKt !== null) rows += row('Velocità', `${fmt0(d.gsKt * 1.852)} km/h`);
-    if (d.track !== null) rows += row('Direzione', `verso ${compass(d.track)}`);
-    rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
+    sub = [rt && rt.airline, d.desc || d.type].filter(Boolean).join(', ') || t('Aereo in volo');
+    rows += row(t('Quota'), altText(pos.alt));
+    if (d.gsKt !== null) rows += row(t('Velocità'), `${fmt0(d.gsKt * 1.852)} km/h`);
+    if (d.track !== null) rows += row(t('Direzione'), t('verso {dir}', { dir: compass(d.track) }));
+    rows += row(t('Distanza da te'), `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
     const ft = flightTimes(d);
     if (ft) {
-      rows += row('Decollo (stima)', `verso le ${hm(ft.dep)}`);
-      rows += row('Atterraggio (stima)', `verso le ${hm(ft.eta)}`);
-      rows += row('Percorso', `${Math.round(ft.progress * 100)}%, mancano ${fmt0(ft.left)} km`);
+      rows += row(t('Decollo (stima)'), t('verso le {time}', { time: hm(ft.dep) }));
+      rows += row(t('Atterraggio (stima)'), t('verso le {time}', { time: hm(ft.eta) }));
+      rows += row(t('Percorso'), t('{pct}%, mancano {km} km', { pct: Math.round(ft.progress * 100), km: fmt0(ft.left) }));
     }
     if (!route) {
-      route = !d.callsign ? 'Rotta non trasmessa da questo aereo'
-        : rt === undefined ? 'Cerco da dove viene e dove va…'
-          : 'Rotta non disponibile per questo volo';
+      route = !d.callsign ? t('Rotta non trasmessa da questo aereo')
+        : rt === undefined ? t('Cerco da dove viene e dove va…')
+          : t('Rotta non disponibile per questo volo');
       routeMuted = true;
     }
-    if (d.callsign && title !== d.callsign) rows += row('Codice radio', escapeHtml(d.callsign));
-    if (d.reg) rows += row('Registrazione', escapeHtml(d.reg));
+    if (d.callsign && title !== d.callsign) rows += row(t('Codice radio'), escapeHtml(d.callsign));
+    if (d.reg) rows += row(t('Registrazione'), escapeHtml(d.reg));
   } else if (kind === 'ship') {
     const sh = state.ships.get(Number(key));
     if (!sh) return closeCard();
@@ -769,9 +774,9 @@ function renderCard() {
     title = shipLabel(d);
     sub = shipTypeName(d.type) + (NAV_STATUS[d.status] ? `, ${NAV_STATUS[d.status]}` : '');
     rows += d.sog > 0.3
-      ? row('Velocità', `${fmt1(d.sog)} nodi (${fmt0(d.sog * 1.852)} km/h)`)
-      : row('Velocità', 'ferma');
-    if (d.sog > 0.3 && d.cog != null) rows += row('Direzione', `verso ${compass(d.cog)}`);
+      ? row(t('Velocità'), t('{kn} nodi ({kmh} km/h)', { kn: fmt1(d.sog), kmh: fmt0(d.sog * 1.852) }))
+      : row(t('Velocità'), t('ferma'));
+    if (d.sog > 0.3 && d.cog != null) rows += row(t('Direzione'), t('verso {dir}', { dir: compass(d.cog) }));
 
     // Rotta: partenza (se l'equipaggio la scrive) e destinazione
     const dest = d.destination ? splitDestination(d.destination) : null;
@@ -781,34 +786,34 @@ function renderCard() {
     if (dest && dest.to) {
       const toName = toPort ? portLabel(toPort) : dest.to;
       const fromName = dest.from ? (fromPort ? portLabel(fromPort) : dest.from) : null;
-      route = fromName ? `${fromName} → ${toName}` : toPort ? `Verso ${toName}` : `Destinazione: ${toName}`;
+      route = fromName ? `${fromName} → ${toName}` : toPort ? t('Verso {place}', { place: toName }) : t('Destinazione: {place}', { place: toName });
       if (toPort) {
         const left = distanceM(pos.lat, pos.lon, toPort.lat, toPort.lon) / 1000;
-        rows += row('Mancano', `${fmt0(left / 1.852)} miglia (${fmt0(left)} km in linea d'aria)`);
+        rows += row(t('Mancano'), t('{nm} miglia ({km} km in linea d\'aria)', { nm: fmt0(left / 1.852), km: fmt0(left) }));
         if (d.sog > 1) {
           const est = new Date(Date.now() + (left / (d.sog * 1.852)) * 3600000 * 1.1);
-          rows += row('Arrivo (stima)', escapeHtml(est.toLocaleString('it-IT', dateFmt)));
+          rows += row(t('Arrivo (stima)'), escapeHtml(est.toLocaleString(LOCALE, dateFmt)));
         }
       }
-      if (toPort) rows += row('Destinazione scritta', escapeHtml(d.destination));
+      if (toPort) rows += row(t('Destinazione scritta'), escapeHtml(d.destination));
     } else {
-      route = 'Destinazione non ancora ricevuta: le navi la trasmettono ogni 6 minuti';
+      route = t('Destinazione non ancora ricevuta: le navi la trasmettono ogni 6 minuti');
       routeMuted = true;
     }
     if (d.eta) {
       const eta = new Date(d.eta);
-      rows += row('Arrivo dichiarato', escapeHtml(eta.toLocaleString('it-IT', dateFmt)));
+      rows += row(t('Arrivo dichiarato'), escapeHtml(eta.toLocaleString(LOCALE, dateFmt)));
     }
-    if (d.length) rows += row('Lunghezza', `${fmt0(d.length)} m`);
-    rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
+    if (d.length) rows += row(t('Lunghezza'), `${fmt0(d.length)} m`);
+    rows += row(t('Distanza da te'), `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
   } else {
     const s = state.sats.get(key);
     if (!s || !s.pos) return closeCard();
     title = s.name;
-    sub = /stazione/i.test(s.name) ? 'Stazione spaziale con equipaggio' : 'Satellite in orbita';
-    rows += row('Quota', `${fmt0(s.pos.alt / 1000)} km`);
-    if (s.pos.speedKms) rows += row('Velocità', `${fmt0(s.pos.speedKms * 3600)} km/h`);
-    rows += row('Distanza da te', `${fmt0(distanceM(h.lat, h.lon, s.pos.lat, s.pos.lon) / 1000)} km in linea d'aria al suolo`);
+    sub = (s.id === '25544' || s.id === '48274') ? t('Stazione spaziale con equipaggio') : t('Satellite in orbita');
+    rows += row(t('Quota'), `${fmt0(s.pos.alt / 1000)} km`);
+    if (s.pos.speedKms) rows += row(t('Velocità'), `${fmt0(s.pos.speedKms * 3600)} km/h`);
+    rows += row(t('Distanza da te'), t('{km} km in linea d\'aria al suolo', { km: fmt0(distanceM(h.lat, h.lon, s.pos.lat, s.pos.lon) / 1000) }));
   }
 
   $('board').hidden = kind === 'ship'; // sulle navi non si sale (per ora)
@@ -874,7 +879,7 @@ function applySound() {
   const btn = $('sound');
   btn.classList.toggle('is-on', state.sound);
   btn.setAttribute('aria-pressed', String(state.sound));
-  btn.textContent = state.sound ? 'Suono' : 'Muto';
+  btn.textContent = state.sound ? t('Suono') : t('Muto');
   if (state.ride?.kind === 'plane' && state.sound) startCabin();
   else stopCabin();
 }
@@ -940,33 +945,33 @@ function updateStatus() {
       const speed = d?.gsKt ? `, ${fmt0(d.gsKt * 1.852)} km/h` : '';
       const route = routeText(d);
       const ft = flightTimes(d);
-      const eta = ft ? `, atterraggio verso le ${hm(ft.eta)}` : '';
-      el.textContent = `A bordo di ${flightName(d)}${route ? `, ${route}` : ''}\n${fmt0(pose.alt)} m${speed}, verso ${compass(pose.heading)}${eta}`;
+      const eta = ft ? t(', atterraggio verso le {time}', { time: hm(ft.eta) }) : '';
+      el.textContent = `${t('A bordo di {name}', { name: flightName(d) })}${route ? `, ${route}` : ''}\n${altText(pose.alt)}${speed}, ${t('verso {dir}', { dir: compass(pose.heading) })}${eta}`;
     } else if (pose) {
-      el.textContent = `A bordo di ${state.sats.get(r.id).name}, ${fmt0(pose.alt / 1000)} km di quota`;
+      el.textContent = t('A bordo di {name}, {km} km di quota', { name: state.sats.get(r.id).name, km: fmt0(pose.alt / 1000) });
     }
     return;
   }
 
   if (state.planeError && !state.planeFetchedAt) {
     el.textContent = state.planeNeedsProxy
-      ? 'Aerei non disponibili: il browser blocca le fonti dirette. Configura il Worker gratuito in js/config.js (vedi README).'
-      : 'Il Worker degli aerei non risponde. Riprovo tra pochi secondi.';
+      ? t('Aerei non disponibili: il browser blocca le fonti dirette. Configura il Worker gratuito in js/config.js (vedi README).')
+      : t('Il Worker degli aerei non risponde. Riprovo tra pochi secondi.');
     return;
   }
   const n = state.planes.size;
   const age = state.planeFetchedAt ? Math.round((Date.now() - state.planeFetchedAt) / 1000) : null;
-  let text = `${n === 1 ? '1 aereo' : `${n} aerei`} e ${state.sats.size} satelliti tracciati`;
-  if (age !== null) text += `. Dati ${state.planeSource}, aggiornati ${age} s fa`;
-  if (state.satError) text += '. Satelliti non disponibili ora';
+  let text = t(n === 1 ? '1 aereo e {sats} satelliti tracciati' : '{n} aerei e {sats} satelliti tracciati', { n, sats: state.sats.size });
+  if (age !== null) text += t('. Dati {src}, aggiornati {age} s fa', { src: state.planeSource, age });
+  if (state.satError) text += t('. Satelliti non disponibili ora');
 
   // Riga delle navi: sempre presente, così si capisce cosa sta succedendo
   const ns = state.ships.size;
   let ships;
-  if (ns) ships = ns === 1 ? '1 nave sul mare' : `${ns} navi sul mare`;
-  else if (state.shipError) ships = 'Navi non disponibili ora, riprovo tra 30 secondi';
-  else if (!state.shipFetchedAt) ships = 'Navi in arrivo…';
-  else ships = 'Nessuna nave ricevuta finora: in questa zona i ricevitori AIS sono pochi, continuo ad ascoltare';
+  if (ns) ships = ns === 1 ? t('1 nave sul mare') : t('{n} navi sul mare', { n: ns });
+  else if (state.shipError) ships = t('Navi non disponibili ora, riprovo tra 30 secondi');
+  else if (!state.shipFetchedAt) ships = t('Navi in arrivo…');
+  else ships = t('Nessuna nave ricevuta finora: in questa zona i ricevitori AIS sono pochi, continuo ad ascoltare');
   text += `.\n${ships}`;
   el.textContent = text.endsWith('…') ? text : text + '.';
 }
@@ -998,11 +1003,11 @@ function readHome() {
 let started = false;
 
 async function setHome(lat, lon, name, opts = {}) {
-  $('intro-msg').textContent = 'Preparo il cielo sopra di te…';
+  $('intro-msg').textContent = t('Preparo il cielo sopra di te…');
   const ground = await sampleHeight(lat, lon).catch(() => 0);
   state.home = { lat, lon, name, ground };
   if (opts.save !== false) saveHome(state.home);
-  $('place').textContent = name;
+  $('place').textContent = t(name);
 
   if (state.ride) endRide();
   closeCard();
@@ -1046,14 +1051,14 @@ async function setHome(lat, lon, name, opts = {}) {
 function useMyLocation() {
   const msg = $('intro-msg');
   if (!('geolocation' in navigator)) {
-    msg.textContent = 'Questo browser non condivide la posizione. Cerca un luogo per nome.';
+    msg.textContent = t('Questo browser non condivide la posizione. Cerca un luogo per nome.');
     return openPlaceDialog();
   }
-  msg.textContent = 'Chiedo la posizione al browser…';
+  msg.textContent = t('Chiedo la posizione al browser…');
   navigator.geolocation.getCurrentPosition(
     (p) => setHome(p.coords.latitude, p.coords.longitude, 'La tua posizione'),
     () => {
-      msg.textContent = 'Posizione non disponibile. Cerca un luogo per nome.';
+      msg.textContent = t('Posizione non disponibile. Cerca un luogo per nome.');
       openPlaceDialog();
     },
     { enableHighAccuracy: false, timeout: 12000, maximumAge: 600000 },
@@ -1072,11 +1077,11 @@ $('place-form').addEventListener('submit', async (e) => {
   const q = $('place-input').value.trim();
   const list = $('place-results');
   if (!q) return;
-  list.innerHTML = '<li><p>Cerco…</p></li>';
+  list.innerHTML = `<li><p>${t('Cerco…')}</p></li>`;
   try {
     const results = await searchPlaces(q);
     if (!results.length) {
-      list.innerHTML = '<li><p>Nessun luogo con questo nome. Prova con la città più vicina.</p></li>';
+      list.innerHTML = `<li><p>${t('Nessun luogo con questo nome. Prova con la città più vicina.')}</p></li>`;
       return;
     }
     list.innerHTML = '';
@@ -1093,7 +1098,7 @@ $('place-form').addEventListener('submit', async (e) => {
       list.append(li);
     }
   } catch {
-    list.innerHTML = '<li><p>La ricerca non risponde. Controlla la connessione e riprova.</p></li>';
+    list.innerHTML = `<li><p>${t('La ricerca non risponde. Controlla la connessione e riprova.')}</p></li>`;
   }
 });
 
@@ -1112,13 +1117,13 @@ const saved = readHome();
 if (saved) {
   const b = $('resume-place');
   b.hidden = false;
-  b.textContent = saved.name === 'La tua posizione' ? 'Torna dove eri' : `Torna a ${saved.name}`;
+  b.textContent = saved.name === 'La tua posizione' ? t('Torna dove eri') : t('Torna a {place}', { place: saved.name });
   b.addEventListener('click', () => setHome(saved.lat, saved.lon, saved.name));
 }
 
 // ---------------------------------------------------------------- aggiornamento automatico
 startAutoUpdate(() => state.mode !== 'ride' && state.mode !== 'arriving', toast).then((v) => {
-  if (v) $('app-version').textContent = `Versione ${v}.`;
+  if (v) $('app-version').textContent = t('Versione {v}.', { v });
 });
 
 // ---------------------------------------------------------------- altezza dei comandi (per non coprirli con la scheda)
@@ -1149,16 +1154,16 @@ $('find-form').addEventListener('submit', async (e) => {
   const q = $('find-input').value.trim();
   const list = $('find-results');
   if (!q) return;
-  list.innerHTML = '<li><p>Cerco nel cielo…</p></li>';
+  list.innerHTML = `<li><p>${t('Cerco nel cielo…')}</p></li>`;
   try {
     const raw = await findFlight(q);
     const flying = raw.map(normalizeAircraft).filter(Boolean);
     if (!raw.length) {
-      list.innerHTML = '<li><p>Nessun aereo in volo con questo codice. Forse non è ancora decollato o è già atterrato, oppure la compagnia usa via radio un codice diverso: prova quello che vedi sul tabellone o su un sito di voli.</p></li>';
+      list.innerHTML = `<li><p>${t('Nessun aereo in volo con questo codice. Forse non è ancora decollato o è già atterrato, oppure la compagnia usa via radio un codice diverso: prova quello che vedi sul tabellone o su un sito di voli.')}</p></li>`;
       return;
     }
     if (!flying.length) {
-      list.innerHTML = '<li><p>L\'ho trovato, ma in questo momento è a terra. Riprova quando sarà decollato.</p></li>';
+      list.innerHTML = `<li><p>${t('L\'ho trovato, ma in questo momento è a terra. Riprova quando sarà decollato.')}</p></li>`;
       return;
     }
     if (flying.length === 1) return boardFound(flying[0]);
@@ -1173,7 +1178,7 @@ $('find-form').addEventListener('submit', async (e) => {
       list.append(li);
     }
   } catch {
-    list.innerHTML = '<li><p>La ricerca non risponde. Controlla la connessione e riprova.</p></li>';
+    list.innerHTML = `<li><p>${t('La ricerca non risponde. Controlla la connessione e riprova.')}</p></li>`;
   }
 });
 
@@ -1188,6 +1193,7 @@ async function shareCurrent() {
   const [kind, key] = shareKey();
   if (!kind || kind === 'ship') return;
   const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('lang', LANG);
   let text;
   if (kind === 'plane') {
     const d = state.planes.get(key)?.data;
@@ -1199,14 +1205,14 @@ async function shareCurrent() {
     const from = rt?.origin && (rt.origin.city || rt.origin.name);
     const to = rt?.destination && (rt.destination.city || rt.destination.name);
     text = from && to
-      ? `Sono al finestrino del volo ${flightName(d)} da ${from} a ${to}, a ${alt} metri. Vieni a guardare in diretta:`
-      : `Sono al finestrino del volo ${flightName(d)}, a ${alt} metri. Vieni a guardare in diretta:`;
+      ? t('Sono al finestrino del volo {name} da {from} a {to}, a {alt} metri. Vieni a guardare in diretta:', { name: flightName(d), from, to, alt })
+      : t('Sono al finestrino del volo {name}, a {alt} metri. Vieni a guardare in diretta:', { name: flightName(d), alt });
   } else {
     const s = state.sats.get(key);
     if (!s) return;
     url.searchParams.set('sat', key);
-    const alt = s.pos ? `, a ${fmt0(s.pos.alt / 1000)} km dalla Terra` : '';
-    text = `Sono a bordo di ${s.name}${alt}. Vieni a guardare in diretta:`;
+    const alt = s.pos ? t(', a {km} km dalla Terra', { km: fmt0(s.pos.alt / 1000) }) : '';
+    text = t('Sono a bordo di {name}{alt}. Vieni a guardare in diretta:', { name: s.name, alt });
   }
   const link = url.toString();
   if (navigator.share) {
@@ -1219,9 +1225,9 @@ async function shareCurrent() {
   }
   try {
     await navigator.clipboard.writeText(`${text} ${link}`);
-    toast('Link copiato: incollalo in un messaggio.');
+    toast(t('Link copiato: incollalo in un messaggio.'));
   } catch {
-    window.prompt('Copia questo link:', link);
+    window.prompt(t('Copia questo link:'), link);
   }
 }
 
@@ -1243,7 +1249,7 @@ async function waitSat(id) {
     if (state.sats.get(id)?.pos) return startRide(`sat:${id}`);
     await new Promise((r) => setTimeout(r, 300));
   }
-  toast('Non trovo più questo satellite. Guarda il cielo sopra di te.');
+  toast(t('Non trovo più questo satellite. Guarda il cielo sopra di te.'));
 }
 
 async function joinFromLink() {
@@ -1252,12 +1258,12 @@ async function joinFromLink() {
   btn.disabled = true;
   try {
     if (linkPlane) {
-      msg.textContent = 'Cerco il volo…';
+      msg.textContent = t('Cerco il volo…');
       let raw = await findFlight(linkPlane).catch(() => []);
       if (!raw.length && linkCs) raw = await findFlight(linkCs).catch(() => []);
       const d = raw.map(normalizeAircraft).find(Boolean);
       if (!d) {
-        msg.textContent = 'Questo volo non è più in aria: probabilmente è atterrato. Puoi guardare il cielo sopra di te.';
+        msg.textContent = t('Questo volo non è più in aria: probabilmente è atterrato. Puoi guardare il cielo sopra di te.');
         btn.hidden = true;
         $('use-location').classList.replace('ghost', 'primary');
         clearLink();
@@ -1270,7 +1276,7 @@ async function joinFromLink() {
         onArrive: () => boardFound(d),
       });
     } else if (linkSat) {
-      msg.textContent = 'Preparo il viaggio in orbita…';
+      msg.textContent = t('Preparo il viaggio in orbita…');
       const home = saved || { lat: 41.9, lon: 12.5, name: 'Italia' };
       clearLink();
       await setHome(home.lat, home.lon, home.name, { save: !!saved, onArrive: () => waitSat(linkSat) });
@@ -1282,8 +1288,8 @@ async function joinFromLink() {
 
 if (linkPlane || linkSat) {
   $('intro-lede').textContent = linkPlane
-    ? `Ti hanno invitato al finestrino del volo ${(linkCs || linkPlane).toUpperCase()}, in diretta. Tocca il pulsante e sali a bordo.`
-    : 'Ti hanno invitato a bordo di un satellite, in diretta. Tocca il pulsante e parti.';
+    ? t('Ti hanno invitato al finestrino del volo {name}, in diretta. Tocca il pulsante e sali a bordo.', { name: (linkCs || linkPlane).toUpperCase() })
+    : t('Ti hanno invitato a bordo di un satellite, in diretta. Tocca il pulsante e parti.');
   $('join-link').hidden = false;
   $('use-location').classList.replace('primary', 'ghost');
   $('join-link').addEventListener('click', joinFromLink);
@@ -1312,10 +1318,10 @@ function lookAt(az, el) {
 }
 
 function heightWords(el) {
-  if (el > 70) return 'quasi sopra la testa';
-  if (el > 40) return 'alto nel cielo';
-  if (el > 15) return 'a metà cielo';
-  return 'basso sull\'orizzonte';
+  if (el > 70) return t('quasi sopra la testa');
+  if (el > 40) return t('alto nel cielo');
+  if (el > 15) return t('a metà cielo');
+  return t('basso sull\'orizzonte');
 }
 
 function renderOverhead() {
@@ -1331,7 +1337,7 @@ function renderOverhead() {
     .slice(0, 6);
 
   if (!items.length) {
-    list.innerHTML = '<li><p>In questo momento nessun aereo è sopra il tuo orizzonte. Riprova tra qualche minuto.</p></li>';
+    list.innerHTML = `<li><p>${t('In questo momento nessun aereo è sopra il tuo orizzonte. Riprova tra qualche minuto.')}</p></li>`;
     return;
   }
   list.innerHTML = '';
@@ -1340,7 +1346,7 @@ function renderOverhead() {
     const b = document.createElement('button');
     b.type = 'button';
     const route = routeText(d);
-    const where = `${fmt1(look.range / 1000)} km, ${heightWords(look.el)} verso ${compass(look.az)}`;
+    const where = `${fmt1(look.range / 1000)} km, ${heightWords(look.el)} ${t('in direzione {dir}', { dir: compass(look.az) })}`;
     b.innerHTML = `${escapeHtml(flightName(d))}${route ? ` <span class="muted">${escapeHtml(route)}</span>` : ''}<small>${escapeHtml(where)}</small>`;
     b.addEventListener('click', () => {
       $('overhead-dialog').close();
@@ -1356,39 +1362,41 @@ function renderPasses() {
   const list = $('overhead-iss');
   const iss = state.sats.get('25544');
   if (!iss) {
-    list.innerHTML = '<li><p>Sto ancora caricando le orbite dei satelliti. Riapri tra qualche secondo.</p></li>';
+    list.innerHTML = `<li><p>${t('Sto ancora caricando le orbite dei satelliti. Riapri tra qualche secondo.')}</p></li>`;
     return;
   }
   const passes = visiblePasses(iss.satrec, state.home, 72, 4);
   if (!passes.length) {
-    list.innerHTML = '<li><p>Nessun passaggio visibile nelle prossime 72 ore: in questi giorni la Stazione passa di giorno o in pieno buio, quando non è illuminata dal Sole.</p></li>';
+    list.innerHTML = `<li><p>${t('Nessun passaggio visibile nelle prossime 72 ore: in questi giorni la Stazione passa di giorno o in pieno buio, quando non è illuminata dal Sole.')}</p></li>`;
     return;
   }
   list.innerHTML = '';
   const dayFmt = { weekday: 'long', day: 'numeric', month: 'long' };
   for (const p of passes) {
     const mins = Math.max(1, Math.round((p.end - p.start) / 60000));
-    const day = p.start.toLocaleDateString('it-IT', dayFmt);
-    const desc = `Appare a ${compass(p.startAz)} alle ${hm(p.start)}, sale fino a ${Math.round(p.maxEl)}° verso ${compass(p.maxAz)} e sparisce a ${compass(p.endAz)} alle ${hm(p.end)}. Visibile a occhio nudo come un punto luminoso che si muove veloce, senza lampeggiare.`;
+    const day = p.start.toLocaleDateString(LOCALE, dayFmt);
+    const desc = t('Appare a {a} alle {t1}, sale fino a {el}° verso {b} e sparisce a {c} alle {t2}. Visibile a occhio nudo come un punto luminoso che si muove veloce, senza lampeggiare.', {
+      a: compass(p.startAz), t1: hm(p.start), el: Math.round(p.maxEl), b: compass(p.maxAz), c: compass(p.endAz), t2: hm(p.end),
+    });
     const li = document.createElement('li');
     li.className = 'pass';
-    li.innerHTML = `<p class="pass-when">${escapeHtml(day)}, alle ${hm(p.start)} <span class="muted">per ${mins} min</span></p>
-      <p class="pass-desc">Da ${compass(p.startAz)} a ${compass(p.endAz)}, alta fino a ${Math.round(p.maxEl)}° sull'orizzonte.</p>`;
+    li.innerHTML = `<p class="pass-when">${escapeHtml(day)}, ${t('alle {time}', { time: hm(p.start) })} <span class="muted">${t('per {min} min', { min: mins })}</span></p>
+      <p class="pass-desc">${t('Da {a} a {b}, alta fino a {el}° sull\'orizzonte.', { a: compass(p.startAz), b: compass(p.endAz), el: Math.round(p.maxEl) })}</p>`;
     const actions = document.createElement('div');
     actions.className = 'pass-actions';
     const cal = document.createElement('button');
     cal.type = 'button';
     cal.className = 'ghost small';
-    cal.textContent = 'Aggiungi al calendario';
-    cal.addEventListener('click', () => downloadPassIcs(p, 'Stazione Spaziale Internazionale', desc));
+    cal.textContent = t('Aggiungi al calendario');
+    cal.addEventListener('click', () => downloadPassIcs(p, t('Stazione Spaziale Internazionale'), desc));
     const see = document.createElement('button');
     see.type = 'button';
     see.className = 'ghost small';
-    see.textContent = 'Dove guardare';
+    see.textContent = t('Dove guardare');
     see.addEventListener('click', () => {
       $('overhead-dialog').close();
       lookAt(p.startAz, 15);
-      toast(`Guarda a ${compass(p.startAz)}, basso sull'orizzonte: alle ${hm(p.start)} la Stazione apparirà lì.`);
+      toast(t('Guarda a {dir}, basso sull\'orizzonte: alle {time} la Stazione apparirà lì.', { dir: compass(p.startAz), time: hm(p.start) }));
     });
     actions.append(see, cal);
     li.append(actions);
@@ -1405,3 +1413,9 @@ function openOverhead() {
 
 $('overhead-btn').addEventListener('click', openOverhead);
 $('overhead-close').addEventListener('click', () => $('overhead-dialog').close());
+
+// ---------------------------------------------------------------- lingua
+document.querySelectorAll('[data-lang]').forEach((b) => {
+  b.classList.toggle('is-on', b.dataset.lang === LANG);
+  b.addEventListener('click', () => { if (b.dataset.lang !== LANG) setLang(b.dataset.lang); });
+});
