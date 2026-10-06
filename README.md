@@ -9,9 +9,21 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Dal basso**: sei nel tuo luogo e guardi il cielo. Trascina per guardarti intorno, pizzica o usa la rotella per zoomare.
 - **Dall'alto**: esplori la zona come su una mappa 3D e scegli un aereo.
 - **A bordo**: finestrino sinistro, destro o vista avanti. Puoi guardarti intorno trascinando.
+- **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
+- **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
 - **Meteo vero**: temperatura e cielo del tuo luogo, con nuvole disegnate in base alla copertura reale.
 - **Satelliti**: la Stazione Spaziale Internazionale, Tiangong e i ~150 satelliti più luminosi. Dall'oblò del satellite vedi la Terra dall'orbita.
 - Si può installare sul telefono come app (menu del browser, "Aggiungi a schermata Home").
+
+## Pubblicare una modifica
+
+Dopo aver cambiato qualcosa, dal terminale nella cartella del progetto:
+
+```bash
+./pubblica.sh "cosa hai cambiato"
+```
+
+Lo script scrive un nuovo numero in `version.json`, fa commit e push. L'app aperta sui dispositivi controlla quel file ogni 5 minuti (e quando torni sulla scheda): se è cambiato si ricarica da sola, ma non mentre sei a bordo di un aereo.
 
 ## Pubblicarla gratis su GitHub Pages
 
@@ -88,6 +100,11 @@ js/weather.js         meteo e ricerca luoghi
 js/geo.js             funzioni geografiche
 js/config.js          indirizzo del Worker per gli aerei
 finestrino-proxy/     intermediario gratuito per i dati degli aerei (Vercel)
+js/audio.js           rumore di cabina generato dal vivo
+js/update.js          controllo nuove versioni
+sw.js                 service worker: file sempre aggiornati, copia offline
+version.json          numero di versione (lo aggiorna pubblica.sh)
+pubblica.sh           pubblica una modifica con un comando
 manifest.webmanifest  installazione come app
 ```
 

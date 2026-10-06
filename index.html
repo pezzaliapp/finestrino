@@ -71,6 +71,7 @@
       <button class="seg is-on" data-view="left">Sinistra</button>
       <button class="seg" data-view="front">Avanti</button>
       <button class="seg" data-view="right">Destra</button>
+      <button id="sound" class="seg sound is-on" aria-pressed="true" title="Rumore di cabina">Suono</button>
       <button id="leave" class="primary">Scendi</button>
     </div>
   </nav>
@@ -104,6 +105,8 @@
         <li><strong>Motore 3D</strong>: <a href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noopener">CesiumJS</a> (Apache 2.0).</li>
       </ul>
       <p class="note">Non usare Finestrino per navigare: le posizioni possono essere in ritardo o mancare.</p>
+      <p class="note">Il rumore di cabina è generato dal vivo nel browser, senza file audio.</p>
+      <p class="note" id="app-version"></p>
       <div class="sheet-actions">
         <button type="button" class="primary" id="credits-close">Chiudi</button>
       </div>

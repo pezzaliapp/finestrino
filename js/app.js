@@ -6,6 +6,8 @@ import { fetchAircraft, aircraftPosition } from './aircraft.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
 import { fetchWeather, describeWeather, searchPlaces } from './weather.js';
 import { bearing, destination, distanceM, clamp, fmt0, fmt1, compass } from './geo.js';
+import { startCabin, stopCabin } from './audio.js';
+import { startAutoUpdate } from './update.js';
 
 const C = window.Cesium;
 const $ = (id) => document.getElementById(id);
@@ -15,6 +17,7 @@ const coarse = matchMedia('(pointer: coarse)').matches;
 const EOX_URL = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg';
 const EOX_CREDIT = '<a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2020)';
 const HOME_KEY = 'finestrino.home.v1';
+const SOUND_KEY = 'finestrino.sound.v1';
 
 const PLANE = C.Color.fromCssColorString('#F2A900');
 const SAT = C.Color.fromCssColorString('#BFE3FF');
@@ -36,7 +39,12 @@ const state = {
   satSource: '',
   satError: false,
   pollTimer: null,
+  sound: readSound(),
 };
+
+function readSound() {
+  try { return localStorage.getItem(SOUND_KEY) !== 'off'; } catch { return true; }
+}
 
 // ---------------------------------------------------------------- Cesium
 const viewer = new C.Viewer('globe', {
@@ -501,10 +509,28 @@ function startRide(id) {
   setFov(kind === 'sat' ? 75 : 62);
   $('sky-controls').hidden = true;
   $('ride-controls').hidden = false;
+  $('sound').hidden = kind !== 'plane'; // nello spazio non c'è rumore
   setView('left');
+  applySound();
   updateStatus();
   pollPlanes();
 }
+
+// Rumore di cabina: solo a bordo degli aerei, mai sui satelliti
+function applySound() {
+  const btn = $('sound');
+  btn.classList.toggle('is-on', state.sound);
+  btn.setAttribute('aria-pressed', String(state.sound));
+  btn.textContent = state.sound ? 'Suono' : 'Muto';
+  if (state.ride?.kind === 'plane' && state.sound) startCabin();
+  else stopCabin();
+}
+
+$('sound').addEventListener('click', () => {
+  state.sound = !state.sound;
+  try { localStorage.setItem(SOUND_KEY, state.sound ? 'on' : 'off'); } catch { /* */ }
+  applySound();
+});
 
 function endRide(message) {
   const r = state.ride;
@@ -512,6 +538,7 @@ function endRide(message) {
   const entity = viewer.entities.getById(`${r.kind}:${r.id}`);
   if (entity) entity.show = true;
   state.ride = null;
+  stopCabin();
   setWindow();
   $('ride-controls').hidden = true;
   $('sky-controls').hidden = false;
@@ -718,3 +745,8 @@ if (saved) {
   b.textContent = saved.name === 'La tua posizione' ? 'Torna dove eri' : `Torna a ${saved.name}`;
   b.addEventListener('click', () => setHome(saved.lat, saved.lon, saved.name));
 }
+
+// ---------------------------------------------------------------- aggiornamento automatico
+startAutoUpdate(() => state.mode !== 'ride' && state.mode !== 'arriving', toast).then((v) => {
+  if (v) $('app-version').textContent = `Versione ${v}.`;
+});
