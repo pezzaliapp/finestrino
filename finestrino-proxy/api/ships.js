@@ -12,7 +12,7 @@ const ALLOWED = [
   'http://localhost:8000',
 ];
 
-const WINDOW_MS = 9000; // per quanto ascoltare il flusso a ogni richiesta
+const WINDOW_MS = 15000; // per quanto ascoltare il flusso a ogni richiesta
 
 function ingest(ships, m) {
   const md = m.MetaData || {};

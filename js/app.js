@@ -431,7 +431,7 @@ function shipCenter() {
       return { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude), nm: 80 };
     }
   }
-  return { lat: state.home.lat, lon: state.home.lon, nm: 90 };
+  return { lat: state.home.lat, lon: state.home.lon, nm: 120 };
 }
 
 async function pollShips() {

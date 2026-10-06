@@ -6,7 +6,7 @@ export async function fetchShips(lat, lon, radiusNm) {
   if (!AIRCRAFT_PROXY) throw new Error('intermediario non configurato');
   const base = AIRCRAFT_PROXY.replace(/\/+$/, '');
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
     const res = await fetch(`${base}/ships/${lat.toFixed(3)}/${lon.toFixed(3)}/${Math.round(radiusNm)}`, { signal: ctrl.signal });
     const json = await res.json().catch(() => ({}));
