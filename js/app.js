@@ -7,6 +7,7 @@ import { loadSatellites, satellitePosition } from './satellites.js';
 import { fetchWeather, describeWeather, searchPlaces } from './weather.js';
 import { bearing, destination, distanceM, clamp, fmt0, fmt1, compass } from './geo.js';
 import { startCabin, stopCabin } from './audio.js';
+import { fetchShips, shipPosition, shipTypeName, NAV_STATUS } from './ships.js';
 import { startAutoUpdate } from './update.js';
 
 const C = window.Cesium;
@@ -21,6 +22,7 @@ const SOUND_KEY = 'finestrino.sound.v1';
 
 const PLANE = C.Color.fromCssColorString('#F2A900');
 const SAT = C.Color.fromCssColorString('#BFE3FF');
+const SHIP = C.Color.fromCssColorString('#3FD6C8');
 const OUTLINE = C.Color.fromCssColorString('#0E1B2C').withAlpha(0.85);
 
 // ---------------------------------------------------------------- stato
@@ -32,6 +34,9 @@ const state = {
   ride: null,                // { kind: 'plane'|'sat', id, view, yaw, pitch }
   planes: new Map(),         // hex -> { data, entity, missed }
   sats: new Map(),           // id  -> { name, satrec, entity, pos }
+  ships: new Map(),          // mmsi -> { data, entity }
+  shipError: false,
+  shipTimer: null,
   selected: null,            // id entità
   planeSource: '',
   planeFetchedAt: 0,
@@ -305,7 +310,7 @@ async function pollPlanes() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.home) pollPlanes();
+  if (!document.hidden && state.home) { pollPlanes(); pollShips(); }
 });
 
 // ---------------------------------------------------------------- satelliti
@@ -356,6 +361,92 @@ function updateSatellites() {
     s.entity.position.setValue(C.Cartesian3.fromDegrees(p.lon, p.lat, p.alt));
     s.entity.show = !ridden;
   }
+}
+
+// ---------------------------------------------------------------- navi
+function shipLabel(d) {
+  return d.name || `MMSI ${d.mmsi}`;
+}
+
+function addShipEntity(mmsi, d) {
+  return viewer.entities.add({
+    id: `ship:${mmsi}`,
+    position: new C.CallbackProperty(() => {
+      const h = state.ships.get(mmsi);
+      if (!h) return undefined;
+      const p = shipPosition(h.data, Date.now());
+      return C.Cartesian3.fromDegrees(p.lon, p.lat, 6);
+    }, false),
+    point: {
+      pixelSize: 7,
+      color: SHIP,
+      outlineColor: OUTLINE,
+      outlineWidth: 2,
+      scaleByDistance: new C.NearFarScalar(2e3, 1.6, 3e5, 0.7),
+    },
+    label: {
+      text: shipLabel(d),
+      font: '12px B612, system-ui, sans-serif',
+      fillColor: SHIP,
+      outlineColor: OUTLINE,
+      outlineWidth: 4,
+      style: C.LabelStyle.FILL_AND_OUTLINE,
+      horizontalOrigin: C.HorizontalOrigin.LEFT,
+      pixelOffset: new C.Cartesian2(9, -6),
+      distanceDisplayCondition: new C.DistanceDisplayCondition(0, 70000),
+    },
+  });
+}
+
+function mergeShips(list) {
+  for (const d of list) {
+    const h = state.ships.get(d.mmsi);
+    if (h) {
+      h.data = { ...h.data, ...d };
+      h.entity.label.text = shipLabel(h.data);
+    } else {
+      state.ships.set(d.mmsi, { data: d, entity: addShipEntity(d.mmsi, d) });
+    }
+  }
+  // Le navi trasmettono di rado: le teniamo 15 minuti dall'ultima posizione ricevuta
+  const now = Date.now();
+  for (const [mmsi, h] of state.ships) {
+    if (now - h.data.seen > 15 * 60 * 1000) {
+      if (state.selected === `ship:${mmsi}`) closeCard();
+      viewer.entities.remove(h.entity);
+      state.ships.delete(mmsi);
+    }
+  }
+}
+
+function shipCenter() {
+  if (state.mode === 'ride') {
+    const pose = ridePose();
+    if (pose) return { lat: pose.lat, lon: pose.lon, nm: state.ride.kind === 'sat' ? 150 : 110 };
+  }
+  if (state.mode === 'map') {
+    const c = camera.pickEllipsoid(new C.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
+    if (c) {
+      const g = C.Cartographic.fromCartesian(c);
+      return { lat: C.Math.toDegrees(g.latitude), lon: C.Math.toDegrees(g.longitude), nm: 80 };
+    }
+  }
+  return { lat: state.home.lat, lon: state.home.lon, nm: 90 };
+}
+
+async function pollShips() {
+  clearTimeout(state.shipTimer);
+  if (state.home && !document.hidden) {
+    const c = shipCenter();
+    try {
+      mergeShips(await fetchShips(c.lat, c.lon, c.nm));
+      state.shipError = false;
+    } catch {
+      state.shipError = true;
+    }
+    updateStatus();
+  }
+  state.shipTimer = setTimeout(pollShips, 30000);
 }
 
 // ---------------------------------------------------------------- nuvole dal meteo vero
@@ -453,6 +544,20 @@ function renderCard() {
     if (d.track !== null) rows += row('Direzione', `verso ${compass(d.track)}`);
     rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
     if (d.reg) rows += row('Registrazione', d.reg);
+  } else if (kind === 'ship') {
+    const sh = state.ships.get(Number(key));
+    if (!sh) return closeCard();
+    const d = sh.data;
+    const pos = shipPosition(d, Date.now());
+    title = shipLabel(d);
+    sub = shipTypeName(d.type) + (NAV_STATUS[d.status] ? `, ${NAV_STATUS[d.status]}` : '');
+    rows += d.sog > 0.3
+      ? row('Velocità', `${fmt1(d.sog)} nodi (${fmt0(d.sog * 1.852)} km/h)`)
+      : row('Velocità', 'ferma');
+    if (d.sog > 0.3 && d.cog != null) rows += row('Direzione', `verso ${compass(d.cog)}`);
+    if (d.destination) rows += row('Destinazione', escapeHtml(d.destination));
+    if (d.length) rows += row('Lunghezza', `${fmt0(d.length)} m`);
+    rows += row('Distanza da te', `${fmt1(distanceM(h.lat, h.lon, pos.lat, pos.lon) / 1000)} km`);
   } else {
     const s = state.sats.get(key);
     if (!s || !s.pos) return closeCard();
@@ -463,6 +568,7 @@ function renderCard() {
     rows += row('Distanza da te', `${fmt0(distanceM(h.lat, h.lon, s.pos.lat, s.pos.lon) / 1000)} km in linea d'aria al suolo`);
   }
 
+  $('board').hidden = kind === 'ship'; // sulle navi non si sale (per ora)
   $('card-title').textContent = title;
   $('card-sub').textContent = sub;
   $('card-data').innerHTML = rows;
@@ -514,6 +620,7 @@ function startRide(id) {
   applySound();
   updateStatus();
   pollPlanes();
+  pollShips();
 }
 
 // Rumore di cabina: solo a bordo degli aerei, mai sui satelliti
@@ -600,10 +707,13 @@ function updateStatus() {
   }
   const n = state.planes.size;
   const age = state.planeFetchedAt ? Math.round((Date.now() - state.planeFetchedAt) / 1000) : null;
-  let text = n === 1 ? '1 aereo in zona' : `${n} aerei in zona`;
-  if (state.sats.size) text += ` e ${state.sats.size} satelliti tracciati`;
+  const parts = [n === 1 ? '1 aereo' : `${n} aerei`];
+  if (state.ships.size) parts.push(state.ships.size === 1 ? '1 nave' : `${state.ships.size} navi`);
+  if (state.sats.size) parts.push(`${state.sats.size} satelliti`);
+  let text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} e ${parts.at(-1)} tracciati` : `${parts[0]} in zona`;
   if (age !== null) text += `. Dati ${state.planeSource}, aggiornati ${age} s fa`;
   if (state.satError) text += '. Satelliti non disponibili ora';
+  if (state.shipError && !state.ships.size) text += '. Navi non disponibili ora';
   el.textContent = text + '.';
 }
 
@@ -644,6 +754,8 @@ async function setHome(lat, lon, name) {
   for (const h of state.planes.values()) viewer.entities.remove(h.entity);
   state.planes.clear();
   state.planeFetchedAt = 0;
+  for (const h of state.ships.values()) viewer.entities.remove(h.entity);
+  state.ships.clear();
 
   $('intro').hidden = true;
   $('topbar').hidden = false;
@@ -667,6 +779,7 @@ async function setHome(lat, lon, name) {
 
   loadWeather();
   pollPlanes();
+  pollShips();
   if (!started) {
     started = true;
     startSatellites();

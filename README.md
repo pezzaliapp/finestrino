@@ -9,6 +9,7 @@ Il cielo sopra di te, adesso. Finestrino mostra gli aerei e i satelliti che ti p
 - **Dal basso**: sei nel tuo luogo e guardi il cielo. Trascina per guardarti intorno, pizzica o usa la rotella per zoomare.
 - **Dall'alto**: esplori la zona come su una mappa 3D e scegli un aereo.
 - **A bordo**: finestrino sinistro, destro o vista avanti. Puoi guardarti intorno trascinando.
+- **Navi e traghetti**: punti azzurri sul mare con nome, tipo (traghetto, cargo, peschereccio, barca a vela…), velocità e destinazione. Visibili da terra, dal finestrino e dall'oblò dei satelliti.
 - **Rumore di cabina**: a bordo degli aerei senti il rombo della cabina, generato dal vivo nel browser (nessun file audio). Il pulsante **Suono** lo spegne. Sui satelliti c'è silenzio.
 - **Si aggiorna da sola**: chi ha l'app aperta riceve la nuova versione entro 5 minuti dalla pubblicazione, senza svuotare la cache.
 - **Meteo vero**: temperatura e cielo del tuo luogo, con nuvole disegnate in base alla copertura reale.
@@ -63,7 +64,17 @@ Il comando stampa un indirizzo come `https://finestrino-proxy.vercel.app`. Scriv
 export const AIRCRAFT_PROXY = 'https://finestrino-proxy.vercel.app';
 ```
 
-Se pubblichi l'app su un dominio diverso, aggiungilo alla lista `ALLOWED` in `finestrino-proxy/api/point.js` e ripeti il deploy.
+Se pubblichi l'app su un dominio diverso, aggiungilo alla lista `ALLOWED` in `finestrino-proxy/api/point.js` e `finestrino-proxy/api/ships.js` e ripeti il deploy.
+
+### Navi (aisstream.io)
+
+Registrati gratis su [aisstream.io](https://aisstream.io), crea una chiave nella pagina API Keys e salvala su Vercel (non va mai scritta nel codice):
+
+```bash
+cd finestrino-proxy
+npx vercel env add AISSTREAM_KEY production
+npx vercel deploy --prod --yes
+```
 
 ## Da dove vengono i dati, e perché è tutto gratis
 
@@ -71,6 +82,7 @@ Se pubblichi l'app su un dominio diverso, aggiungilo alla lista `ALLOWED` in `fi
 | --- | --- | --- |
 | Aerei | [ADSB.lol](https://adsb.lol) | API aperta, dati ODbL. L'autore ha annunciato che in futuro potrebbe servire una chiave, ottenibile inviando dati con un proprio ricevitore. |
 | Aerei (riserva) | [adsb.fi](https://adsb.fi) e [OpenSky Network](https://opensky-network.org) | Uso personale non commerciale, massimo 1 richiesta al secondo, va citato. L'app rispetta il limite. |
+| Navi | [aisstream.io](https://aisstream.io) | Gratuito per uso non commerciale con una chiave personale, che resta nascosta su Vercel (variabile `AISSTREAM_KEY`). Posizioni con 1-3 minuti di ritardo. |
 | Satelliti | [CelesTrak](https://celestrak.org) + [satellite.js](https://github.com/shashwatak/satellite-js) | Dati scaricati al massimo una volta ogni 2 ore per browser, come chiede CelesTrak. |
 | Immagini della Terra | [Sentinel-2 cloudless di EOX](https://s2maps.eu) | Gratis per uso non commerciale con attribuzione. |
 | Rilievo 3D | Terrain Tiles di Mapzen su AWS Open Data | Gratis, nessuna chiave. |

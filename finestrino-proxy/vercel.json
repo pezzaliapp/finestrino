@@ -1,5 +1,9 @@
 {
+  "functions": {
+    "api/ships.js": { "maxDuration": 15 }
+  },
   "rewrites": [
-    { "source": "/point/:lat/:lon/:nm", "destination": "/api/point?lat=:lat&lon=:lon&nm=:nm" }
+    { "source": "/point/:lat/:lon/:nm", "destination": "/api/point?lat=:lat&lon=:lon&nm=:nm" },
+    { "source": "/ships/:lat/:lon/:nm", "destination": "/api/ships?lat=:lat&lon=:lon&nm=:nm" }
   ]
 }
