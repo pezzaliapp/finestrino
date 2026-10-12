@@ -138,9 +138,13 @@
   <!-- Cerca un volo -->
   <dialog id="find-dialog" class="sheet">
     <form id="find-form" class="sheet-form">
-      <h2 data-i18n>Cerca un volo in aria</h2>
+      <h2 data-i18n>Cerca un volo</h2>
       <input id="find-input" type="search" placeholder="FR1234, AZ1234, RYR4KX o EI-DYC" autocomplete="off" autocapitalize="characters" required data-i18n-attr="placeholder">
-      <p class="hint" data-i18n>Scrivi il numero del volo come sul biglietto. Alcune compagnie, come Ryanair ed easyJet, via radio usano un codice diverso: se non lo trovo, prova quello che vedi sul tabellone o su un sito di voli (per esempio RYR4KX).</p>
+      <div class="route-row">
+        <input id="find-from" type="text" placeholder="Da (es. Ancona)" autocomplete="off" data-i18n-attr="placeholder,aria-label" aria-label="Aeroporto di partenza">
+        <input id="find-to" type="text" placeholder="A (es. Catania)" autocomplete="off" data-i18n-attr="placeholder,aria-label" aria-label="Aeroporto di arrivo">
+      </div>
+      <p class="hint" data-i18n>Scrivi il numero del volo come sul biglietto e, se lo sai, da dove parte e dove arriva. Con la rotta lo trovo anche quando la compagnia via radio usa un altro codice (Ryanair, easyJet…), anche a terra prima del decollo, e puoi condividere il viaggio prima di partire.</p>
       <ul id="find-results" class="results"></ul>
       <div class="sheet-actions">
         <button type="button" class="ghost" id="find-cancel" data-i18n>Chiudi</button>

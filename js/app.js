@@ -5,7 +5,8 @@ import './lang-en.js';
 import { t, LANG, LOCALE, translatePage, setLang } from './i18n.js';
 import { createTerrainProvider, sampleHeight } from './terrain.js';
 import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
-import { findFlight, findFlightFull, getRoute, knownRoute, placeName } from './flights.js';
+import { findFlight, findFlightFull, findTrip, getRoute, knownRoute, placeName } from './flights.js';
+import { resolveAirport, airportLabel } from './airports.js';
 import { visiblePasses, downloadPassIcs } from './sky.js';
 import { splitDestination, knownPort, portLabel } from './ports.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
@@ -1157,7 +1158,8 @@ function boardFound(d) {
 
 $('find-btn').addEventListener('click', openFindDialog);
 $('find-cancel').addEventListener('click', () => $('find-dialog').close());
-// Attesa del decollo: controlla ogni 20 secondi e sale a bordo appena l'aereo è in volo.
+// Attesa del decollo: controlla ogni 25 secondi e sale a bordo appena l'aereo è in volo.
+// check() restituisce l'aereo in volo (già convertito) oppure null.
 let watch = null;
 
 function stopWatch() {
@@ -1165,27 +1167,42 @@ function stopWatch() {
   watch = null;
 }
 
-function startWatch(query, name) {
+function startWatch(check, name) {
   stopWatch();
-  const w = { query, name, until: Date.now() + 4 * 3600 * 1000, timer: null };
+  const w = { name, until: Date.now() + 6 * 3600 * 1000, timer: null };
   watch = w;
   const tick = async () => {
     if (watch !== w) return;
     if (Date.now() > w.until) { stopWatch(); return; }
     try {
-      const { ac } = await findFlightFull(w.query);
+      const d = await check(w);
       if (watch !== w) return;
-      const d = ac.map(normalizeAircraft).find(Boolean);
       if (d) {
         stopWatch();
         toast(t('{name} è decollato: sali a bordo!', { name: w.name }));
         return boardFound(d);
       }
     } catch { /* riprova al prossimo giro */ }
-    w.timer = setTimeout(tick, 20000);
+    w.timer = setTimeout(tick, 25000);
   };
-  w.timer = setTimeout(tick, 20000);
+  w.timer = setTimeout(tick, 25000);
 }
+
+/** Controllo per codice (identificativo, codice radio o numero di volo). */
+const checkFind = (query) => async () => {
+  const { ac } = await findFlightFull(query);
+  return ac.map(normalizeAircraft).find(Boolean) || null;
+};
+
+/** Controllo per rotta; appena vede l'aereo (anche a terra) passa a seguirlo per identificativo. */
+const checkTrip = (flight, from, to) => async (w) => {
+  if (w.hex) return checkFind(w.hex)();
+  const { ac } = await findTrip(flight, from, to);
+  const d = ac.map(normalizeAircraft).find(Boolean);
+  if (d) return d;
+  if (ac[0] && ac[0].hex) w.hex = ac[0].hex;
+  return null;
+};
 
 const hhmm = (utc) => {
   const ms = utc ? Date.parse(String(utc).replace(' ', 'T')) : NaN;
@@ -1203,29 +1220,130 @@ function nearestEnd(ground, ends) {
   return best && best.dist < 15000 ? best : null;
 }
 
-function findMessage(html, waitQuery, name) {
-  const list = $('find-results');
-  list.innerHTML = `<li><p>${html}</p></li>`;
-  if (!waitQuery) return;
-  startWatch(waitQuery, name);
+// --- piccoli aiuti per riempire l'elenco dei risultati
+function resultMsg(html) {
+  $('find-results').innerHTML = `<li><p>${html}</p></li>`;
+}
+
+function resultButton(title, small, onClick) {
   const li = document.createElement('li');
   const b = document.createElement('button');
   b.type = 'button';
-  b.innerHTML = `${escapeHtml(t('Non aspettare più'))}<small>${escapeHtml(t('Puoi chiudere questa finestra: continuo a controllare e ti porto a bordo al decollo.'))}</small>`;
-  b.addEventListener('click', () => { stopWatch(); li.remove(); });
+  b.innerHTML = `${escapeHtml(title)}${small ? `<small>${escapeHtml(small)}</small>` : ''}`;
+  b.addEventListener('click', () => onClick(li));
   li.append(b);
-  list.append(li);
+  $('find-results').append(li);
+  return li;
+}
+
+function waitControls(check, name) {
+  startWatch(check, name);
+  resultButton(t('Non aspettare più'), t('Puoi chiudere questa finestra: continuo a controllare e ti porto a bordo al decollo.'), (li) => { stopWatch(); li.remove(); });
+}
+
+function listFlying(flying) {
+  $('find-results').innerHTML = '';
+  for (const d of flying) {
+    resultButton(planeLabel(d), [d.desc || d.type, `${fmt0(d.altM)} m`].filter(Boolean).join(', '), () => boardFound(d));
+  }
 }
 
 const DONE = ['Arrived'];
 const CANCELED = ['Canceled', 'CanceledUncertain'];
+const looksLikeFlight = (q) => /^[A-Z0-9]{2}\s*\d{1,4}[A-Z]?$/i.test(q.trim()) && !/^\d{2}/.test(q.trim());
 
-$('find-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+// --- ricerca per compagnia e rotta: funziona anche prima del decollo
+async function searchTrip(flight, A, B, typedA, typedB) {
+  const name = flight.toUpperCase().replace(/\s+/g, '');
+  const from = airportLabel(A, typedA);
+  const to = airportLabel(B, typedB);
+  const route = escapeHtml(t('da {from} a {to}', { from, to }));
+  resultMsg(escapeHtml(t('Cerco {name} {route}…', { name, route: t('da {from} a {to}', { from, to }) })));
+  const { ac, nearby } = await findTrip(name, A.iata, B.iata);
+  const flying = ac.map(normalizeAircraft).filter(Boolean);
+  if (flying.length === 1) return boardFound(flying[0]);
+  if (flying.length > 1) return listFlying(flying);
+
+  const share = () => resultButton(t('Condividi questo viaggio'), t('Chi apre il link vede il volo e sale a bordo con te appena decolla.'), () => shareTrip(name, A, B, from, to));
+  const ground = ac[0];
+  if (ground) {
+    const cs = (ground.flight || '').trim();
+    if (distanceM(ground.lat, ground.lon, B.lat, B.lon) < 15000) {
+      resultMsg(t('{name} è già atterrato a {where}. Ora è a terra.', { name: escapeHtml(name), where: escapeHtml(to) }));
+      return;
+    }
+    resultMsg(t('{name}{route} è a terra a {where}, in attesa di decollare.', { name: escapeHtml(name), route: ` ${route}`, where: escapeHtml(from) })
+      + (cs && cs !== name ? ` ${escapeHtml(t('Via radio si chiama {cs}.', { cs }))}` : '')
+      + ` ${escapeHtml(t('Ti porto a bordo appena si alza in volo.'))}`);
+    share();
+    waitControls(checkFind(ground.hex), name);
+    return;
+  }
+
+  resultMsg(t('Non vedo ancora {name} {route}: probabilmente è al parcheggio con il trasponditore spento. Resto in attesa e ti porto a bordo appena decolla.', { name: escapeHtml(name), route }));
+  share();
+  waitControls(checkTrip(name, A.iata, B.iata), name);
+
+  if (nearby.length) {
+    const li = document.createElement('li');
+    li.innerHTML = `<p>${escapeHtml(t('Aerei della compagnia fermi adesso a {where}: se il tuo è uno di questi, toccalo.', { where: from }))}</p>`;
+    $('find-results').append(li);
+    for (const a of nearby) {
+      const cs = (a.flight || '').trim();
+      const rt = a._route;
+      const dest = rt && rt.destination ? (rt.destination.city || rt.destination.iata) : null;
+      resultButton(cs, dest ? t('Rotta registrata verso {to}', { to: dest }) : (a.r || ''), () => {
+        const d = normalizeAircraft(a);
+        if (d) return boardFound(d);
+        resultMsg(t('{name} è a terra a {where}, in attesa di decollare.', { name: escapeHtml(cs), where: escapeHtml(from) }) + ` ${escapeHtml(t('Ti porto a bordo appena si alza in volo.'))}`);
+        share();
+        waitControls(checkFind(a.hex), name);
+      });
+    }
+  }
+}
+
+async function shareTrip(name, A, B, from, to) {
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('lang', LANG);
+  url.searchParams.set('viaggio', name);
+  url.searchParams.set('da', A.iata);
+  url.searchParams.set('a', B.iata);
+  const text = t('Sto per partire con il volo {name} da {from} a {to}. Apri il link: appena decolliamo sali a bordo con me e guardi dal mio finestrino in diretta.', { name, from, to });
+  return shareLink(text, url.toString());
+}
+
+// --- ricerca dal modulo
+async function runSearch() {
   const q = $('find-input').value.trim();
+  const fromTxt = $('find-from').value.trim();
+  const toTxt = $('find-to').value.trim();
   const list = $('find-results');
   if (!q) return;
   stopWatch();
+
+  if (fromTxt || toTxt) {
+    if (!fromTxt || !toTxt) {
+      resultMsg(escapeHtml(t('Scrivi sia da dove parte sia dove arriva, oppure lascia vuoti tutti e due.')));
+      return;
+    }
+    if (!looksLikeFlight(q)) {
+      resultMsg(escapeHtml(t('Con la rotta scrivi il numero del volo come sul biglietto, per esempio FR299.')));
+      return;
+    }
+    const [A, B] = await Promise.all([resolveAirport(fromTxt), resolveAirport(toTxt)]);
+    if (!A || !B) {
+      resultMsg(escapeHtml(t('Non conosco l\'aeroporto «{x}». Prova con la città o con il codice di tre lettere (per esempio AOI).', { x: !A ? fromTxt : toTxt })));
+      return;
+    }
+    try {
+      return await searchTrip(q, A, B, fromTxt, toTxt);
+    } catch {
+      resultMsg(t('La ricerca non risponde. Controlla la connessione e riprova.'));
+      return;
+    }
+  }
+
   list.innerHTML = `<li><p>${t('Cerco nel cielo…')}</p></li>`;
   try {
     const { ac: raw, schedule: sc } = await findFlightFull(q);
@@ -1238,19 +1356,7 @@ $('find-form').addEventListener('submit', async (e) => {
     const routeTxt = from && to ? ` ${escapeHtml(t('da {from} a {to}', { from, to }))}` : '';
 
     if (flying.length === 1) return boardFound(flying[0]);
-    if (flying.length > 1) {
-      list.innerHTML = '';
-      for (const d of flying) {
-        const li = document.createElement('li');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.innerHTML = `${escapeHtml(planeLabel(d))}<small>${escapeHtml([d.desc || d.type, `${fmt0(d.altM)} m`].filter(Boolean).join(', '))}</small>`;
-        b.addEventListener('click', () => boardFound(d));
-        li.append(b);
-        list.append(li);
-      }
-      return;
-    }
+    if (flying.length > 1) return listFlying(flying);
 
     // Visto dai ricevitori, ma a terra: in attesa di partire o appena arrivato
     const ground = raw.find((a) => typeof a.lat === 'number' && typeof a.lon === 'number');
@@ -1265,47 +1371,65 @@ $('find-form').addEventListener('submit', async (e) => {
       const label = escapeHtml(name);
       if ((at && at.role === 'to') || (sc && DONE.includes(sc.status))) {
         const where = at ? placeName(at.a) : to;
-        findMessage(where
+        resultMsg(where
           ? t('{name} è già atterrato a {where}{time}. Ora è a terra.', { name: label, where: escapeHtml(where), time: arr ? ` ${t('alle {t}', { t: arr })}` : '' })
           : t('{name} è a terra. Probabilmente è già atterrato.', { name: label }));
         return;
       }
       const where = at ? placeName(at.a) : from;
       const when = dep ? ` ${escapeHtml(t('Partenza prevista alle {t}.', { t: dep }))}` : '';
-      findMessage(
+      resultMsg(
         (where
           ? t('{name}{route} è a terra a {where}, in attesa di decollare.', { name: label, route: routeTxt, where: escapeHtml(where) })
           : t('{name}{route} è a terra, in attesa di decollare.', { name: label, route: routeTxt })) + when + ' ' + escapeHtml(t('Ti porto a bordo appena si alza in volo.')),
-        ground.hex, name,
       );
+      waitControls(checkFind(ground.hex), name);
       return;
     }
 
-    // Non trasmette la posizione, ma l'orario del volo è noto
+    // Non trasmette la posizione, ma l'orario del volo è noto (solo con la chiave facoltativa)
     if (sc) {
       const label = escapeHtml(name);
       if (CANCELED.includes(sc.status)) {
-        findMessage(t('{name}{route} risulta cancellato.', { name: label, route: routeTxt }));
+        resultMsg(t('{name}{route} risulta cancellato.', { name: label, route: routeTxt }));
         return;
       }
       if (DONE.includes(sc.status)) {
-        findMessage(t('{name}{route} è già atterrato{time}.', { name: label, route: routeTxt, time: arr ? ` ${t('alle {t}', { t: arr })}` : '' }));
+        resultMsg(t('{name}{route} è già atterrato{time}.', { name: label, route: routeTxt, time: arr ? ` ${t('alle {t}', { t: arr })}` : '' }));
         return;
       }
       const when = dep ? ` ${escapeHtml(t('Partenza prevista alle {t}.', { t: dep }))}` : '';
       const radio = sc.callsign && sc.callsign !== name.replace(/\s+/g, '') ? ` ${escapeHtml(t('Via radio si chiama {cs}.', { cs: sc.callsign }))}` : '';
-      findMessage(
-        t('{name}{route} non trasmette ancora la sua posizione.', { name: label, route: routeTxt }) + when + radio + ' ' + escapeHtml(t('Ti porto a bordo appena si alza in volo.')),
-        sc.hex || sc.callsign || q, name,
-      );
+      resultMsg(t('{name}{route} non trasmette ancora la sua posizione.', { name: label, route: routeTxt }) + when + radio + ' ' + escapeHtml(t('Ti porto a bordo appena si alza in volo.')));
+      waitControls(checkFind(sc.hex || sc.callsign || q), name);
       return;
     }
 
-    findMessage(escapeHtml(t('Non trovo questo volo. Forse non è ancora partito o è già atterrato, oppure la compagnia usa via radio un codice diverso dal numero di volo (FR299, per esempio, vola come RYR2SN): prova quello che vedi su un sito di voli.')));
+    if (looksLikeFlight(q)) {
+      resultMsg(escapeHtml(t('Con il solo numero di volo non lo vedo: molte compagnie via radio usano un altro codice. Scrivi anche da dove parte e dove arriva (per esempio Ancona e Catania) e premi di nuovo Cerca.')));
+      $('find-from').focus();
+      return;
+    }
+    resultMsg(escapeHtml(t('Non trovo questo volo. Forse non è ancora partito o è già atterrato, oppure la compagnia usa via radio un codice diverso dal numero di volo (FR299, per esempio, vola come RYR2SN): prova quello che vedi su un sito di voli.')));
   } catch {
     list.innerHTML = `<li><p>${t('La ricerca non risponde. Controlla la connessione e riprova.')}</p></li>`;
   }
+}
+
+$('find-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  runSearch();
 });
+
+/** Apre la ricerca già compilata (link di un viaggio condiviso) e la avvia. */
+function openTripSearch(flight, from, to) {
+  $('find-results').innerHTML = '';
+  $('find-input').value = flight;
+  $('find-from').value = from;
+  $('find-to').value = to;
+  if (!$('find-dialog').open) $('find-dialog').showModal();
+  runSearch();
+}
 
 // ---------------------------------------------------------------- condividi
 function shareKey() {
@@ -1339,7 +1463,10 @@ async function shareCurrent() {
     const alt = s.pos ? t(', a {km} km dalla Terra', { km: fmt0(s.pos.alt / 1000) }) : '';
     text = t('Sono a bordo di {name}{alt}. Vieni a guardare in diretta:', { name: s.name, alt });
   }
-  const link = url.toString();
+  return shareLink(text, url.toString());
+}
+
+async function shareLink(text, link) {
   if (navigator.share) {
     try {
       await navigator.share({ title: 'Finestrino', text, url: link });
@@ -1364,6 +1491,9 @@ const params = new URLSearchParams(location.search);
 const linkPlane = params.get('volo');
 const linkCs = params.get('cs');
 const linkSat = params.get('sat');
+const linkTrip = params.get('viaggio');
+const linkFrom = params.get('da');
+const linkTo = params.get('a');
 
 function clearLink() {
   history.replaceState(null, '', location.pathname);
@@ -1387,6 +1517,17 @@ async function joinFromLink() {
       let raw = await findFlight(linkPlane).catch(() => []);
       if (!raw.length && linkCs) raw = await findFlight(linkCs).catch(() => []);
       const d = raw.map(normalizeAircraft).find(Boolean);
+      const parked = !d && raw.find((a) => typeof a.lat === 'number' && typeof a.lon === 'number');
+      if (parked) {
+        // A terra (non ancora partito): andiamo lì e aspettiamo il decollo
+        const home = saved || { lat: parked.lat, lon: parked.lon, name: 'Aeroporto' };
+        clearLink();
+        await setHome(home.lat, home.lon, home.name, {
+          save: !!saved,
+          onArrive: () => openTripSearch(parked.hex, '', ''),
+        });
+        return;
+      }
       if (!d) {
         msg.textContent = t('Questo volo non è più in aria: probabilmente è atterrato. Puoi guardare il cielo sopra di te.');
         btn.hidden = true;
@@ -1400,6 +1541,16 @@ async function joinFromLink() {
         save: !!saved,
         onArrive: () => boardFound(d),
       });
+    } else if (linkTrip) {
+      msg.textContent = t('Cerco il volo…');
+      const [A, B] = await Promise.all([resolveAirport(linkFrom), resolveAirport(linkTo)]);
+      const start = A || B || { lat: 41.9, lon: 12.5, city: 'Italia' };
+      const home = saved || { lat: start.lat, lon: start.lon, name: start.city || start.name };
+      clearLink();
+      await setHome(home.lat, home.lon, home.name, {
+        save: !!saved,
+        onArrive: () => openTripSearch(linkTrip, linkFrom || '', linkTo || ''),
+      });
     } else if (linkSat) {
       msg.textContent = t('Preparo il viaggio in orbita…');
       const home = saved || { lat: 41.9, lon: 12.5, name: 'Italia' };
@@ -1411,10 +1562,12 @@ async function joinFromLink() {
   }
 }
 
-if (linkPlane || linkSat) {
+if (linkPlane || linkSat || linkTrip) {
   $('intro-lede').textContent = linkPlane
     ? t('Ti hanno invitato al finestrino del volo {name}, in diretta. Tocca il pulsante e sali a bordo.', { name: (linkCs || linkPlane).toUpperCase() })
-    : t('Ti hanno invitato a bordo di un satellite, in diretta. Tocca il pulsante e parti.');
+    : linkTrip
+      ? t('Ti hanno invitato a seguire il volo {name} da {from} a {to}. Tocca il pulsante: se è già in volo sali subito a bordo, altrimenti ti ci porto appena decolla.', { name: linkTrip.toUpperCase(), from: linkFrom || '?', to: linkTo || '?' })
+      : t('Ti hanno invitato a bordo di un satellite, in diretta. Tocca il pulsante e parti.');
   $('join-link').hidden = false;
   $('use-location').classList.replace('primary', 'ghost');
   $('join-link').addEventListener('click', joinFromLink);

@@ -28,6 +28,13 @@ export async function findFlightFull(query) {
   return { ac: j.ac || [], schedule: j.schedule || null };
 }
 
+/** Cerca un volo per compagnia e rotta (FR299 da AOI a CTA): { ac, nearby }, anche a terra. */
+export async function findTrip(flight, from, to) {
+  const f = String(flight || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const j = await get(`/trip/${encodeURIComponent(f)}/${encodeURIComponent(from)}/${encodeURIComponent(to)}`, 25000);
+  return { ac: j.ac || [], nearby: j.nearby || [] };
+}
+
 const routes = new Map(); // codice radio -> Promise<route|null>
 
 /** Rotta del volo (partenza e arrivo), con memoria per non chiederla due volte. */

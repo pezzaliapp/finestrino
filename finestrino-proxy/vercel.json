@@ -2,6 +2,9 @@
   "functions": {
     "api/ships.js": {
       "maxDuration": 25
+    },
+    "api/trip.js": {
+      "maxDuration": 20
     }
   },
   "rewrites": [
@@ -20,6 +23,10 @@
     {
       "source": "/route/:cs",
       "destination": "/api/route?cs=:cs"
+    },
+    {
+      "source": "/trip/:f/:from/:to",
+      "destination": "/api/trip?f=:f&from=:from&to=:to"
     }
   ]
 }
