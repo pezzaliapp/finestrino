@@ -5,7 +5,7 @@ import './lang-en.js';
 import { t, LANG, LOCALE, translatePage, setLang } from './i18n.js';
 import { createTerrainProvider, sampleHeight } from './terrain.js';
 import { fetchAircraft, aircraftPosition, normalizeAircraft } from './aircraft.js';
-import { findFlight, knownRoute, placeName } from './flights.js';
+import { findFlight, findFlightFull, getRoute, knownRoute, placeName } from './flights.js';
 import { visiblePasses, downloadPassIcs } from './sky.js';
 import { splitDestination, knownPort, portLabel } from './ports.js';
 import { loadSatellites, satellitePosition } from './satellites.js';
@@ -1157,34 +1157,151 @@ function boardFound(d) {
 
 $('find-btn').addEventListener('click', openFindDialog);
 $('find-cancel').addEventListener('click', () => $('find-dialog').close());
+// Attesa del decollo: controlla ogni 20 secondi e sale a bordo appena l'aereo è in volo.
+let watch = null;
+
+function stopWatch() {
+  if (watch) clearTimeout(watch.timer);
+  watch = null;
+}
+
+function startWatch(query, name) {
+  stopWatch();
+  const w = { query, name, until: Date.now() + 4 * 3600 * 1000, timer: null };
+  watch = w;
+  const tick = async () => {
+    if (watch !== w) return;
+    if (Date.now() > w.until) { stopWatch(); return; }
+    try {
+      const { ac } = await findFlightFull(w.query);
+      if (watch !== w) return;
+      const d = ac.map(normalizeAircraft).find(Boolean);
+      if (d) {
+        stopWatch();
+        toast(t('{name} è decollato: sali a bordo!', { name: w.name }));
+        return boardFound(d);
+      }
+    } catch { /* riprova al prossimo giro */ }
+    w.timer = setTimeout(tick, 20000);
+  };
+  w.timer = setTimeout(tick, 20000);
+}
+
+const hhmm = (utc) => {
+  const ms = utc ? Date.parse(String(utc).replace(' ', 'T')) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : null;
+};
+
+/** Il più vicino tra aeroporto di partenza e di arrivo, con la distanza. */
+function nearestEnd(ground, ends) {
+  let best = null;
+  for (const [role, a] of ends) {
+    if (!a || typeof a.lat !== 'number' || typeof a.lon !== 'number') continue;
+    const dist = distanceM(ground.lat, ground.lon, a.lat, a.lon);
+    if (!best || dist < best.dist) best = { role, a, dist };
+  }
+  return best && best.dist < 15000 ? best : null;
+}
+
+function findMessage(html, waitQuery, name) {
+  const list = $('find-results');
+  list.innerHTML = `<li><p>${html}</p></li>`;
+  if (!waitQuery) return;
+  startWatch(waitQuery, name);
+  const li = document.createElement('li');
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.innerHTML = `${escapeHtml(t('Non aspettare più'))}<small>${escapeHtml(t('Puoi chiudere questa finestra: continuo a controllare e ti porto a bordo al decollo.'))}</small>`;
+  b.addEventListener('click', () => { stopWatch(); li.remove(); });
+  li.append(b);
+  list.append(li);
+}
+
+const DONE = ['Arrived'];
+const CANCELED = ['Canceled', 'CanceledUncertain'];
+
 $('find-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const q = $('find-input').value.trim();
   const list = $('find-results');
   if (!q) return;
+  stopWatch();
   list.innerHTML = `<li><p>${t('Cerco nel cielo…')}</p></li>`;
   try {
-    const raw = await findFlight(q);
+    const { ac: raw, schedule: sc } = await findFlightFull(q);
     const flying = raw.map(normalizeAircraft).filter(Boolean);
-    if (!raw.length) {
-      list.innerHTML = `<li><p>${t('Nessun aereo in volo con questo codice. Forse non è ancora decollato o è già atterrato, oppure la compagnia usa via radio un codice diverso: prova quello che vedi sul tabellone o su un sito di voli.')}</p></li>`;
-      return;
-    }
-    if (!flying.length) {
-      list.innerHTML = `<li><p>${t('L\'ho trovato, ma in questo momento è a terra. Riprova quando sarà decollato.')}</p></li>`;
-      return;
-    }
+    const name = (sc && sc.flight) || (sc && sc.callsign) || q.toUpperCase();
+    const from = sc && sc.origin ? placeName(sc.origin) : null;
+    const to = sc && sc.destination ? placeName(sc.destination) : null;
+    const dep = sc && sc.origin ? hhmm(sc.origin.revised || sc.origin.scheduled) : null;
+    const arr = sc && sc.destination ? hhmm(sc.destination.runway || sc.destination.revised || sc.destination.scheduled) : null;
+    const routeTxt = from && to ? ` ${escapeHtml(t('da {from} a {to}', { from, to }))}` : '';
+
     if (flying.length === 1) return boardFound(flying[0]);
-    list.innerHTML = '';
-    for (const d of flying) {
-      const li = document.createElement('li');
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.innerHTML = `${escapeHtml(planeLabel(d))}<small>${escapeHtml([d.desc || d.type, `${fmt0(d.altM)} m`].filter(Boolean).join(', '))}</small>`;
-      b.addEventListener('click', () => boardFound(d));
-      li.append(b);
-      list.append(li);
+    if (flying.length > 1) {
+      list.innerHTML = '';
+      for (const d of flying) {
+        const li = document.createElement('li');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerHTML = `${escapeHtml(planeLabel(d))}<small>${escapeHtml([d.desc || d.type, `${fmt0(d.altM)} m`].filter(Boolean).join(', '))}</small>`;
+        b.addEventListener('click', () => boardFound(d));
+        li.append(b);
+        list.append(li);
+      }
+      return;
     }
+
+    // Visto dai ricevitori, ma a terra: in attesa di partire o appena arrivato
+    const ground = raw.find((a) => typeof a.lat === 'number' && typeof a.lon === 'number');
+    if (ground) {
+      const cs = (ground.flight || '').trim();
+      let ends = sc ? [['from', sc.origin], ['to', sc.destination]] : [];
+      if (!ends.length && cs) {
+        const rt = await getRoute(cs);
+        if (rt) ends = [['from', rt.origin], ['to', rt.destination]];
+      }
+      const at = nearestEnd(ground, ends);
+      const label = escapeHtml(name);
+      if ((at && at.role === 'to') || (sc && DONE.includes(sc.status))) {
+        const where = at ? placeName(at.a) : to;
+        findMessage(where
+          ? t('{name} è già atterrato a {where}{time}. Ora è a terra.', { name: label, where: escapeHtml(where), time: arr ? ` ${t('alle {t}', { t: arr })}` : '' })
+          : t('{name} è a terra. Probabilmente è già atterrato.', { name: label }));
+        return;
+      }
+      const where = at ? placeName(at.a) : from;
+      const when = dep ? ` ${escapeHtml(t('Partenza prevista alle {t}.', { t: dep }))}` : '';
+      findMessage(
+        (where
+          ? t('{name}{route} è a terra a {where}, in attesa di decollare.', { name: label, route: routeTxt, where: escapeHtml(where) })
+          : t('{name}{route} è a terra, in attesa di decollare.', { name: label, route: routeTxt })) + when + ' ' + escapeHtml(t('Ti porto a bordo appena si alza in volo.')),
+        ground.hex, name,
+      );
+      return;
+    }
+
+    // Non trasmette la posizione, ma l'orario del volo è noto
+    if (sc) {
+      const label = escapeHtml(name);
+      if (CANCELED.includes(sc.status)) {
+        findMessage(t('{name}{route} risulta cancellato.', { name: label, route: routeTxt }));
+        return;
+      }
+      if (DONE.includes(sc.status)) {
+        findMessage(t('{name}{route} è già atterrato{time}.', { name: label, route: routeTxt, time: arr ? ` ${t('alle {t}', { t: arr })}` : '' }));
+        return;
+      }
+      const when = dep ? ` ${escapeHtml(t('Partenza prevista alle {t}.', { t: dep }))}` : '';
+      const radio = sc.callsign && sc.callsign !== name.replace(/\s+/g, '') ? ` ${escapeHtml(t('Via radio si chiama {cs}.', { cs: sc.callsign }))}` : '';
+      findMessage(
+        t('{name}{route} non trasmette ancora la sua posizione.', { name: label, route: routeTxt }) + when + radio + ' ' + escapeHtml(t('Ti porto a bordo appena si alza in volo.')),
+        sc.hex || sc.callsign || q, name,
+      );
+      return;
+    }
+
+    findMessage(escapeHtml(t('Non trovo questo volo. Forse non è ancora partito o è già atterrato, oppure la compagnia usa via radio un codice diverso dal numero di volo (FR299, per esempio, vola come RYR2SN): prova quello che vedi su un sito di voli.')));
   } catch {
     list.innerHTML = `<li><p>${t('La ricerca non risponde. Controlla la connessione e riprova.')}</p></li>`;
   }

@@ -15,12 +15,17 @@ async function get(path, timeout = 15000) {
   }
 }
 
-/** Cerca aerei in volo per numero di volo, codice radio, registrazione o identificativo. Restituisce i dati grezzi. */
+/** Cerca aerei (in volo o a terra) per numero di volo, codice radio, registrazione o identificativo. Restituisce i dati grezzi. */
 export async function findFlight(query) {
+  return (await findFlightFull(query)).ac;
+}
+
+/** Come findFlight, più l'orario del volo quando l'intermediario lo conosce: { ac, schedule }. */
+export async function findFlightFull(query) {
   const q = String(query || '').trim();
-  if (q.length < 3) return [];
+  if (q.length < 3) return { ac: [], schedule: null };
   const j = await get(`/find/${encodeURIComponent(q)}`);
-  return j.ac || [];
+  return { ac: j.ac || [], schedule: j.schedule || null };
 }
 
 const routes = new Map(); // codice radio -> Promise<route|null>

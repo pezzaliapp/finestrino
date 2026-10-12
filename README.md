@@ -83,6 +83,20 @@ npx vercel env add AISSTREAM_KEY production
 npx vercel deploy --prod --yes
 ```
 
+### Cercare i voli per numero (AeroDataBox, facoltativo)
+
+Molte compagnie via radio non usano il numero di volo: Ryanair, per esempio, fa volare FR299 come `RYR2SN`. Senza un orario dei voli l'app non può sapere che sono lo stesso aereo, e cercando "FR299" non lo trova. Con una chiave gratuita di AeroDataBox l'intermediario scopre il codice radio vero e l'aereo assegnato, quindi trova il volo anche a terra prima del decollo (e ti porta a bordo appena decolla) o dopo l'atterraggio.
+
+Registrati su [RapidAPI](https://rapidapi.com/aedbx-aedbx/api/aerodatabox), iscriviti al piano gratuito (Basic) di AeroDataBox, copia la chiave `X-RapidAPI-Key` e salvala su Vercel:
+
+```bash
+cd finestrino-proxy
+npx vercel env add AERODATABOX_KEY production
+npx vercel deploy --prod --yes
+```
+
+Il piano gratuito ha un numero limitato di richieste al mese: l'intermediario ricorda ogni orario per 10 minuti e, mentre aspetta il decollo, l'app controlla l'aereo direttamente senza chiedere di nuovo l'orario. Senza chiave tutto funziona come prima: si può sempre cercare con il codice radio (RYR2SN) o la registrazione.
+
 ## Da dove vengono i dati, e perché è tutto gratis
 
 | Cosa | Fonte | Condizioni |
@@ -90,6 +104,7 @@ npx vercel deploy --prod --yes
 | Aerei | [ADSB.lol](https://adsb.lol) | API aperta, dati ODbL. L'autore ha annunciato che in futuro potrebbe servire una chiave, ottenibile inviando dati con un proprio ricevitore. |
 | Aerei (riserva) | [adsb.fi](https://adsb.fi) e [OpenSky Network](https://opensky-network.org) | Uso personale non commerciale, massimo 1 richiesta al secondo, va citato. L'app rispetta il limite. |
 | Rotte dei voli | [adsbdb](https://www.adsbdb.com) | Gratuito. Dati delle rotte di David Taylor e Jim Mason: mostrati a ogni richiesta, mai copiati in un nostro database. |
+| Orari dei voli (facoltativo) | [AeroDataBox](https://aerodatabox.com) | Piano gratuito con chiave personale, nascosta su Vercel (variabile `AERODATABOX_KEY`). Serve solo per cercare per numero di volo. |
 | Navi | [aisstream.io](https://aisstream.io) | Gratuito per uso non commerciale con una chiave personale, che resta nascosta su Vercel (variabile `AISSTREAM_KEY`). Posizioni con 1-3 minuti di ritardo. |
 | Satelliti | [CelesTrak](https://celestrak.org) + [satellite.js](https://github.com/shashwatak/satellite-js) | Dati scaricati al massimo una volta ogni 2 ore per browser, come chiede CelesTrak. |
 | Immagini della Terra | [Sentinel-2 cloudless di EOX](https://s2maps.eu) | Gratis per uso non commerciale con attribuzione. |

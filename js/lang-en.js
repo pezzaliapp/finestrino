@@ -191,5 +191,21 @@ registerEnglish({
   "Rumore di cabina": "Cabin sound",
   "Condividi questo finestrino": "Share this window seat",
   "Città o paese": "City or town",
-  "FR1234, AZ1234, RYR4KX o EI-DYC": "FR1234, BA178, RYR4KX or EI-DYC"
+  "FR1234, AZ1234, RYR4KX o EI-DYC": "FR1234, BA178, RYR4KX or EI-DYC",
+  "{name} è decollato: sali a bordo!": "{name} has taken off: climb aboard!",
+  "Non aspettare più": "Stop waiting",
+  "Puoi chiudere questa finestra: continuo a controllare e ti porto a bordo al decollo.": "You can close this window: I'll keep checking and take you aboard at take-off.",
+  "da {from} a {to}": "from {from} to {to}",
+  "alle {t}": "at {t}",
+  "{name} è già atterrato a {where}{time}. Ora è a terra.": "{name} has already landed in {where}{time}. It's on the ground now.",
+  "{name} è a terra. Probabilmente è già atterrato.": "{name} is on the ground. It has probably already landed.",
+  "Partenza prevista alle {t}.": "Expected departure at {t}.",
+  "{name}{route} è a terra a {where}, in attesa di decollare.": "{name}{route} is on the ground in {where}, waiting to take off.",
+  "{name}{route} è a terra, in attesa di decollare.": "{name}{route} is on the ground, waiting to take off.",
+  "Ti porto a bordo appena si alza in volo.": "I'll take you aboard as soon as it takes off.",
+  "{name}{route} risulta cancellato.": "{name}{route} has been cancelled.",
+  "{name}{route} è già atterrato{time}.": "{name}{route} has already landed{time}.",
+  "Via radio si chiama {cs}.": "Its radio callsign is {cs}.",
+  "{name}{route} non trasmette ancora la sua posizione.": "{name}{route} isn't broadcasting its position yet.",
+  "Non trovo questo volo. Forse non è ancora partito o è già atterrato, oppure la compagnia usa via radio un codice diverso dal numero di volo (FR299, per esempio, vola come RYR2SN): prova quello che vedi su un sito di voli.": "I can't find this flight. It may not have left yet or may have already landed, or the airline uses a radio callsign different from the flight number (FR299, for example, flies as RYR2SN): try the one shown on a flight-tracking site."
 });
