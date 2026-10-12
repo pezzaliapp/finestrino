@@ -212,7 +212,7 @@ registerEnglish({
   "Condividi questo viaggio": "Share this trip",
   "Chi apre il link vede il volo e sale a bordo con te appena decolla.": "Whoever opens the link sees the flight and climbs aboard with you as soon as it takes off.",
   "{name} è già atterrato a {where}. Ora è a terra.": "{name} has already landed in {where}. It's on the ground now.",
-  "Non vedo ancora {name} {route}: probabilmente è al parcheggio con il trasponditore spento. Resto in attesa e ti porto a bordo appena decolla.": "I can't see {name} {route} yet: it's probably parked with its transponder off. I'll keep watching and take you aboard as soon as it takes off.",
+  "Non vedo {name} {route}. Se deve ancora partire, probabilmente è al parcheggio con il trasponditore spento: resto in attesa e ti porto a bordo appena decolla. Se il volo di oggi è già atterrato non lo vedrò: riprova il giorno del volo, poco prima della partenza.": "I can't see {name} {route}. If it hasn't left yet, it's probably parked with its transponder off: I'll keep watching and take you aboard as soon as it takes off. If today's flight has already landed I won't see it: try again on the day of the flight, shortly before departure.",
   "Aerei della compagnia fermi adesso a {where}: se il tuo è uno di questi, toccalo.": "The airline's aircraft parked in {where} right now: if yours is one of them, tap it.",
   "Rotta registrata verso {to}": "Recorded route to {to}",
   "{name} è a terra a {where}, in attesa di decollare.": "{name} is on the ground in {where}, waiting to take off.",

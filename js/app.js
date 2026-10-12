@@ -1280,7 +1280,7 @@ async function searchTrip(flight, A, B, typedA, typedB) {
     return;
   }
 
-  resultMsg(t('Non vedo ancora {name} {route}: probabilmente è al parcheggio con il trasponditore spento. Resto in attesa e ti porto a bordo appena decolla.', { name: escapeHtml(name), route }));
+  resultMsg(t('Non vedo {name} {route}. Se deve ancora partire, probabilmente è al parcheggio con il trasponditore spento: resto in attesa e ti porto a bordo appena decolla. Se il volo di oggi è già atterrato non lo vedrò: riprova il giorno del volo, poco prima della partenza.', { name: escapeHtml(name), route }));
   share();
   waitControls(checkTrip(name, A.iata, B.iata), name);
 
